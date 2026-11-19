@@ -49,11 +49,12 @@ TERMS = [
 
 def run_battery(gating):
     """Differentiel circuit vs spec sur toute la batterie. Renvoie
-    (total_steps, total_tokens, max_simul, max_closes)."""
+    (total_steps, total_tokens, max_simul, max_closes, binder_stats)."""
     total_tokens = 0
     total_steps = 0
     max_simul = 0
     max_closes = 0
+    b_stats = {"interne": 0, "hors-corps": 0, "libre": 0}
     for term in TERMS:
         cur_term = lb.parse(term)
         for step in range(12):
@@ -87,11 +88,33 @@ def run_battery(gating):
                     kind = "LAM"
                 else:
                     kind = "APP"
-                cur = stack.feed(kind)
+                binder_n = (tid - 4) if kind == "VAR" else None
+                cur, b_circuit = stack.feed(kind, binder_n)
                 if kind != "SKIP":
                     self_spec = spec[gi][0] + 8 * spec[gi][1]
                     assert cur == self_spec, \
                         (term, step + 1, pos, cur, self_spec)
+                if kind == "VAR":
+                    # lecture v3b-2 du canal BIND depuis l'etat de la pile
+                    _tid, _d, _sf, _sc, bf, bc, libre = row
+                    b_src = bf + 8 * bc
+                    if libre:
+                        assert b_circuit is None, (term, "libre: pile muette")
+                        assert (spec[gi][2], spec[gi][3]) == (7, 7)
+                        b_stats["libre"] += 1
+                    elif b_src > d_lam:
+                        # binder interne : le (n+1)-ieme LAM actif, a sa
+                        # profondeur d'ancrage (= b_src - 1)
+                        assert b_circuit == b_src - 1, \
+                            (term, binder_n, b_circuit, b_src)
+                        assert spec[gi][2] + 8 * spec[gi][3] == b_src - 1
+                        b_stats["interne"] += 1
+                    else:
+                        # binder hors du corps : pile muette, BIND source
+                        assert b_circuit is None, (term, "hors corps")
+                        assert (spec[gi][2], spec[gi][3]) == (bf, bc)
+                        b_stats["hors-corps"] += 1
+                if kind != "SKIP":
                     gi += 1
             assert stack.levels == [], (term, "BODY doit fermer au dernier")
             for lv in stack.all:
@@ -101,7 +124,7 @@ def run_battery(gating):
             total_tokens += len(spec)
             total_steps += 1
             cur_term, _ = lb.beta_step(cur_term)
-    return total_steps, total_tokens, max_simul, max_closes
+    return total_steps, total_tokens, max_simul, max_closes, b_stats
 
 
 def main():
@@ -110,15 +133,15 @@ def main():
     print("=" * 64)
 
     # 1. v3a : injection selective par niveau
-    st, tk, simul, _c = run_battery("selective")
-    print("  v3a  selective : %d etapes, %d tokens, profondeur exacte ; "
-          "fermetures simultanees max = %d" % (st, tk, simul))
+    st, tk, simul, _c, bs = run_battery("selective")
+    print("  v3a  selective : %d etapes, %d tokens, profondeur + binders "
+          "exactes ; fermetures simultanees max = %d" % (st, tk, simul))
 
     # 2. v3b-1 : injection GLOBALE + coupure par refractaire long :
     #    chaque INTG decharge AU PLUS une fois (max_closes <= 1)
-    st2, tk2, simul2, mc = run_battery("global")
-    print("  v3b  global    : %d etapes, %d tokens, profondeur exacte ; "
-          "fermetures simultanees max = %d ; decharges/INTG = %d "
+    st2, tk2, simul2, mc, _ = run_battery("global")
+    print("  v3b  global    : %d etapes, %d tokens, profondeur + binders "
+          "exactes ; fermetures simultanees max = %d ; decharges/INTG = %d "
           "(coupure OK)" % (st2, tk2, simul2, mc))
     assert mc == 1, "le refractaire long doit rendre chaque INTG sourd \
         apres son discharge"
@@ -127,7 +150,10 @@ def main():
 
     print()
     print("PILE RE-SCAN VALIDEE : %d etapes, %d tokens gardes, "
-          "profondeur exacte dans les deux modes" % (st, tk))
+          "profondeur + binders exacts dans les deux modes" % (st, tk))
+    print("binders lus sur l'etat de la pile : %d internes, %d hors corps, "
+          "%d libres (detection automatique par pile muette)"
+          % (bs["interne"], bs["hors-corps"], bs["libre"]))
     print("fermetures simultanees max observees sur un slot : %d "
           "(sommee, pas « -1 par slot »)" % simul)
     assert simul >= 3, "le cas limite des fermetures simultanees doit \

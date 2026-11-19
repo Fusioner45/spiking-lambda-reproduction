@@ -108,14 +108,24 @@ a differential bench: the composed cube (v2) must remain exactly equal.
     battery (16 steps / 64 tokens). Remaining honest boundary: the
     wiring (which INTG is connected to the global ports) still happens
     at push time, same status as Section 2.11 initialization.
-  * Open question for v3b-2: the paper's PERSIST/GATE gate (Section
-    2.9) assumes PERSIST levels pre-armed before the scan -- its
-    tonic PERSIST->GATE filter rises in tau_syn = 20 ms (2.5 slots),
-    too slow for dynamically-pushed levels that live 1-2 slots.
-    Options: pre-created pool + warmup, dynamic weights, or a faster
-    tonic filter with re-checked margins. The binder readout (each
-    LAM level's anchored depth read off the active stack top, the
-    levels below inhibited) rides on the same PERSIST structure.
+  * v3b-2 DONE: binder readout off the live stack. read_binder(n)
+    returns the anchored depth of the (n+1)-th active LAM from the
+    stack top, or None (muted stack) when the binder is outside the
+    body or the variable is free -- the free detection is automatic
+    (no stack LAM can cover it). Validated on the full battery in both
+    gating modes: 15 internal binders read off the stack, 5
+    outside-body, 4 free. Design lesson: the binder read happens
+    BETWEEN the emission of the token and the closures it triggers --
+    the last token of a body closes the whole stack on the same slot,
+    so reading after feed() would see an empty stack.
+  * Open question for v3b-3: the physical BIND bus with the
+    inhibition chain (each active LAM projects its anchored depth and
+    inhibits the LAM levels below it; the discharge frees the bus for
+    the enclosing LAM). Design difficulty documented: when the top is
+    cut, a serial inhibition chain stops propagating (two emitters on
+    the bus) -- parallel inhibition or a tokenized read sequence is
+    needed. The free-index port (emitting n-1 on channels 5-6) and the
+    compose_cube integration behind a flag ride with it.
 * v3c (1 session): remove `body_slot`'s channel-level KEEP rule from
   the meta-controller; the decrement is now fully neural. The boundary
   note moves to "output ordering only" (the paper's own boundary).

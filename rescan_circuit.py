@@ -33,6 +33,22 @@ niveau, coupee par le discharge) demande des niveaux pre-creees avec
 warmup ou des poids dynamiques : le tonique PERSIST->GATE du papier
 monte en tau_syn=20 ms (2,5 slots), trop lent pour nos niveaux
 dynamiques de 1-2 slots — question ouverte pour la v3b-2.
+
+Dimensionnement du refractaire : t_ref = slot_ms x (max_tokens + 2)
+compte DEPUIS le discharge — un niveau ferme au slot 0 reste sourd
+jusqu'a la fin du scan + 2 slots de marge : le pire cas est couvre par
+construction, pas de reveil possible avant la fin du parcours.
+
+v3b-2 : la lecture du binder (canal BIND) lit l'ETAT de la pile —
+les niveaux actifs, dont les fermetures sont les discharges reels du
+circuit — via read_binder(n) : le (n+1)-ieme LAM depuis le sommet a sa
+profondeur d'ancrage, None si la pile n'a pas assez de LAM (binder hors
+du corps, ou variable libre). Le bus physique a inhibition (chaque LAM
+actif projette sa profondeur et inhibe les niveaux LAM sous lui ; le
+discharge libere la main au LAM englobant — design propose par
+l'utilisateur) est le mecanisme neural cible : sa difficulte de design
+(probleme des deux emetteurs quand l'inhibition en chaine se coupe)
+est documentee dans docs/design_nested_scan.md pour la v3b-3.
 """
 
 import snn_engine as se
@@ -71,7 +87,9 @@ class RescanStack:
         t_ref = 0.1
         if self.gating == "global":
             # refractaire long : au discharge, le neurone devient sourd
-            # jusqu'a la fin du scan (slot_ms par token + marge)
+            # jusqu'a la fin du scan (slot_ms par token + marge, mesure
+            # depuis le discharge : le pire cas — fermeture au slot 0 —
+            # reste sourd jusqu'a la fin + 2 slots)
             t_ref = self.slot_ms * (self.max_tokens + 2)
         if isinstance(self.net, se.Network):
             return self.net.add(se.Neuron(tau_m=self.tau_m, t_ref=t_ref,
@@ -101,11 +119,15 @@ class RescanStack:
         return self.d_lam + sum(1 for lv in self.levels
                                 if lv["kind"] == "LAM")
 
-    def feed(self, kind):
+    def feed(self, kind, binder_n=None):
         """Traite un token (kind : 'LAM', 'APP', 'VAR' ou 'SKIP') au slot
-        courant. Renvoie la profondeur d'emission du token (self_new) ;
-        les fermetures de niveaux déclenchées par ce token sont
-        appliquées à la fin du slot."""
+        courant. Renvoie (cur, b) : la profondeur d'emission du token
+        (self_new), et — si binder_n est passe (pour un VAR) — la
+        profondeur d'ancrage du (binder_n+1)-ieme LAM actif, lue ENTRE
+        l'emission et les fermetures que ce token declenche (le dernier
+        token d'un corps ferme toute la pile au meme slot : la lecture
+        apres feed() lirait une pile vide). b=None : binder hors corps
+        ou variable libre."""
         cur = self._cur()
         t0 = self.slot * self.slot_ms
         if kind == "LAM":
@@ -128,6 +150,9 @@ class RescanStack:
             else:
                 for lv in self.levels:
                     self.net.inject_spike(lv["pv"], t0)
+        # lecture du binder : l'etat de la pile APRES l'emission du token,
+        # AVANT les fermetures qu'il declenche
+        b = self.read_binder(binder_n) if binder_n is not None else None
         # simuler exactement un slot ; toute decharge d'un niveau OUVERT =
         # fermeture (les decharges des niveaux deja fermes ne doivent pas
         # exister : le refractaire long rend le niveau sourd — le banc
@@ -144,8 +169,26 @@ class RescanStack:
             self.levels.remove(lv)
         self.last_closures = len(closed)
         self.slot += 1
-        return cur
+        return cur, b
 
     def open_lams(self):
         """Profondeur courante selon l'etat de la pile (lecture circuit)."""
         return self._cur()
+
+    def read_binder(self, n):
+        """Lecture v3b-2 du canal BIND depuis l'etat de la pile : la
+        profondeur d'ancrage du (n+1)-ieme LAM ACTIF depuis le sommet
+        (n = 0 : le lieur le plus proche), ou None si la pile compte
+        moins de n+1 LAM actifs — binder hors du corps, ou variable
+        libre (la detection des libres est automatique : aucun LAM de
+        la pile ne peut les couvrir). Les fermetures de la pile sont
+        les discharges reels du circuit : un binder qui a ferme n'est
+        plus lisible (et un lieur ne ferme jamais avant sa variable :
+        preuve structurelle, le binder englobe le token)."""
+        lam_seen = 0
+        for lv in reversed(self.levels):
+            if lv["kind"] == "LAM":
+                if lam_seen == n:
+                    return lv["depth"]
+                lam_seen += 1
+        return None
