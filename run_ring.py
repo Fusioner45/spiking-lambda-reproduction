@@ -44,7 +44,7 @@ def main():
 
     # 1. calibration + onde entretenue + ISI
     ring = rp.PhaseRing()
-    fires, isis = ring.run(0, 26)
+    fires, _t, isis = ring.run(0, 26)
     print("  W_ring=%.2f (epsilon(5,1)=%.3f) ; onde : %d feux "
           "(26 demandes), ISI moyen %.2f ms (papier : ~4.9)"
           % (ring.w_ring, ring.eps51, len(fires),
@@ -57,7 +57,7 @@ def main():
     for d in range(50):                    # profondeurs 0..49 (papier)
         for sh in range(20):
             phi0 = d % 8
-            f, _ = ring.run(phi0, sh + 1)
+            f, _t2, _isi = ring.run(phi0, sh + 1)
             ok = all(f[i] == (phi0 + i) % 8 for i in range(sh + 1))
             carries = sum(1 for i in range(1, sh + 1)
                           if f[i] < f[i - 1])
@@ -72,7 +72,7 @@ def main():
     assert n_ok == 1000, bad
 
     # 4. sh = 0 : reponse = ordinal 0, aucune propagation requise
-    f, _ = ring.run(5, 1)
+    f, _t3, _i2 = ring.run(5, 1)
     assert f[0] == 5
     print("  sh = 0 : ordinal 0 = FINE[phi_0] tel quel (l'orchestrateur")
     print("  court-circuite l'onde pour un decalage nul) : OK")

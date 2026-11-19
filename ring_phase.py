@@ -74,8 +74,9 @@ class PhaseRing:
                     isis.append(t - fires[-1][1])
                 fires.append((idx, t))
                 if len(fires) >= n_fires:
-                    return [f[0] for f in fires], isis
-        return [f[0] for f in fires], isis
+                    return ([f[0] for f in fires],
+                            [f[1] for f in fires], isis)
+        return ([f[0] for f in fires], [f[1] for f in fires], isis)
 
 
 # ---- preuve structurelle sh >= 0 + valeurs par occurrence ---------------

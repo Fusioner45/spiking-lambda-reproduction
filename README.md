@@ -36,6 +36,14 @@ See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and
 `bench_scale_results.md` for the scaling measurements.
 
+## Figures
+
+Generated from the real circuits (`python make_figures.py`):
+
+![Redex detection](assets/fig_det.png)
+![Balance counter](assets/fig_intg.png)
+![Phase ring](assets/fig_ring.png)
+
 ## Quick start
 
 Python 3.8+, standard library only.

@@ -180,7 +180,7 @@ class ClosedLoop:
         for j in bound_abs:
             d_var = toks[j][1]
             sh = d_var - 1 - toks[K][1]
-            f, _ = self.ring.run(d_var % 8, sh + 1)
+            f, _t, _isi = self.ring.run(d_var % 8, sh + 1)
             assert f[sh] == (d_var % 8 + sh) % 8, (j, sh)
             bound_sh[j] = sh
         rep["shifts"] = sorted(set(bound_sh.values()))

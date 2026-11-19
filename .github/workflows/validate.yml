@@ -1,0 +1,36 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  banks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile the C core
+        run: gcc -O2 -shared -fPIC -o snn_core.so snn_core.c -lm
+
+      - name: Run validation banks
+        run: |
+          set -e
+          for b in run_demo run_bridge run_det run_freevars run_intg \
+                   run_persist run_copy run_bind run_ring run_loop \
+                   run_snn_core run_robustness run_noise run_envelope \
+                   run_scale; do
+            echo "=== $b ==="
+            python "$b.py"
+          done
+
+      - name: Summary
+        run: echo "All validation banks passed."
