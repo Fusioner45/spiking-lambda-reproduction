@@ -109,18 +109,26 @@ This reproduction follows the same split:
 `run_cube.py`), the next cube is written slot by slot by the STDP copy
 circuits and read back through recall dynamics: the tokens consumed by
 the next reduction step come out of the copy memories, not out of a
-symbolic re-encoding. Each slot stores 7 phase channels: the 4 paper
-channels (self and binder phases), a type channel (the paper carries
-token identity on distinct populations, Section 2.1), and 2 channels
-for the free-variable index; for bound variables the index is already
-recoverable from the binder channels (n = d - 1 - b). Any silent
-channel is detected at readout, so a corrupted memory stops the loop
-instead of silently corrupting the reduction.
+symbolic re-encoding. The slot patterns are composed from the current
+term's emissions: copies of the source patterns, phase-ring shifts for
+the inserted argument tokens (the carry is read off the ring's observed
+wraps), and the Section 2.10.3 KEEP rule applied channel by channel.
+A differential test checks this composition against the re-encoding
+canal by canal on every step. Each slot stores 7 phase channels: the 4
+paper channels (self and binder phases), a type channel (the paper
+carries token identity on distinct populations, Section 2.1), and 2
+channels for the free-variable index; for bound variables the index is
+already recoverable from the binder channels (n = d - 1 - b). Any
+silent channel is detected at readout, so a corrupted memory stops the
+loop instead of silently corrupting the reduction.
 
-**Remaining gap vs the paper.** The write addressing (which slot
-receives which token, the topographic sort of Section 2.10.3) is still
-the Python meta-controller, as in the paper's own boundary. Replacing
-it with nested SCAN circuits is the next architectural step.
+**Remaining gap vs the paper.** The KEEP decrement (-1 on the body
+tokens whose enclosing lambda disappears) is applied channel by
+channel in the meta-controller, exactly as the paper's own Python
+assembles its output events (Section 2.11); the routing decisions
+(which slot receives which token) come from the real circuits. Making
+the decrement neural, through a re-scan of the body by nested SCAN
+circuits, is the next architectural step.
 
 ## Status and limits
 

@@ -14,9 +14,12 @@ net.step(dt)... reads the result after HALT ») :
       5. patterns  <- copie theta-cycle STDP (§2.8), par token emis
   - l'ASSEMBLAGE des evenements de sortie (§2.10.3) est symbolique
     (tri topographique par position d'entree, comme chez les auteurs).
-  - Option living_cube (cf. cube_state.py) : le prochain cube est
-    ECRIT slot par slot par les copies STDP et LU par rappel — l'etat
-    vit dans les memoires au lieu d'etre re-encode symboliquement.
+  - Option living_cube (cf. cube_state.py + cube_write.py) : le
+    prochain cube est ECRIT slot par slot par les copies STDP, avec des
+    patterns COMPOSES depuis les emissions du terme courant (copies des
+    sources + shifts REELS du ring + regles KEEP canal-level §2.10.3),
+    et LU par rappel — l'etat vit dans les memoires, l'ecriture ne
+    re-encode plus le nouveau terme.
 
 Regles d'assemblage (le piege signale par Gemini, §2.10.3 shift_bind) :
   - jetons du CORPS conserves (KEEP) : profondeur -1 (le lambda du redex
@@ -41,6 +44,7 @@ import bind_gamma
 import ring_phase
 import copy_stdp
 import cube_state
+import cube_write
 import snn_core
 
 RESERVED_FINE = 7                  # code (7,7) des libres (notre fix)
@@ -215,14 +219,27 @@ class ClosedLoop:
         #    passe par les memoires, pas par le symbole (un canal muet
         #    ou corrompu casse l'assertion : le cube est porteur)
         if self.living_cube:
-            new_rows = fv.rows_fix(bd.tokens_to_db(new_toks))
-            assert [(r[0], r[1]) for r in new_rows] == new_toks
+            # v2 : les patterns des slots sont COMPOSES depuis les
+            # emissions du terme courant (copies des sources + shifts
+            # REELS du ring) et les regles KEEP canal-level du §2.10.3
+            # (cube_write.compose_cube) — aucun re-encodage du nouveau
+            # terme dans l'ecriture
+            slot_pats = cube_write.compose_cube(
+                toks, rows, K, l_body, l_arg, bound_sh, self.ring)
+            if not self.production:
+                # differentiel : la composition reproduit exactement
+                # l'encodage du terme assemble (filet, mode verifie)
+                new_rows = fv.rows_fix(bd.tokens_to_db(new_toks))
+                assert [(r[0], r[1]) for r in new_rows] == new_toks
+                assert slot_pats == [
+                    cube_state.slot_pattern_from_row(r) for r in new_rows], rep
             cube = cube_state.CubeState(engine=self.copy_engine)
-            for s, row in enumerate(new_rows):
-                cube.write(s, cube_state.slot_pattern_from_row(row))
+            for s, pat in enumerate(slot_pats):
+                cube.write(s, pat)
             read_toks = cube.read_all()
             assert read_toks == new_toks, rep   # memoire fidele sinon stop
             rep["cube_slots"] = len(cube.slots)
+            rep["cube_write"] = "composed"      # sources + ring, pas rows_fix
             new_toks = read_toks                # l'ETAT vient du cube
         # reconstruction du terme (NOTRE boucle, pas l'oracle)
         nxt = bd.from_debruijn(bd.tokens_to_db(new_toks))
