@@ -81,6 +81,31 @@ python run_snn_core.py    # differential test: Python engine vs C engine
 | `snn_core.c` / `snn_core.py` | bit-faithful C core + ctypes wrapper |
 | `run_*.py` | one validation bank per stage, plus robustness, noise and scale |
 
+## Scope: what runs on spikes, what runs in Python
+
+The paper draws this boundary explicitly (Section 2.11): "Python code
+only: (i) initialises the working-memory cube from the input term;
+(ii) calls net.step(dt) in the simulation loop; (iii) reads the result
+after HALT."
+
+This reproduction follows the same split:
+
+* **On simulated neurons** — redex detection, subterm segmentation,
+  argument-mode signalling, variable binding, the phase-ring shift,
+  theta-cycle STDP copying, and the PERSIST/GATE/SCAN orchestration.
+  Each circuit is validated against a symbolic oracle in isolation.
+* **In Python (the meta-controller)** — cube initialisation, event
+  collection and topographic ordering, term re-encoding between
+  reduction steps, and the per-step oracle comparison.
+
+**Known gap vs the paper.** In the authors' implementation, the STDP
+copy circuits write the next working-memory cube directly: the cube is
+the live state of the reducer. In this reproduction, the copy circuits
+are validated per pattern while the cube update goes through a symbolic
+re-encoding. Closing that gap (making the STDP-written cube the actual
+state) is the next architectural step, together with replacing the
+remaining symbolic event assembly with nested SCAN circuits.
+
 ## Status and limits
 
 All 13 validation banks pass. Known limits, documented in the note:
