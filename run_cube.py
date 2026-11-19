@@ -87,8 +87,18 @@ def main():
                for r in fv.rows_fix(bd.tokens_to_db(new_toks))]
         assert pats == ref, (term, pats, ref)
         assert len(pats) == len(new_toks)
-        print("  composition %-24s : %d slots, EXACT canal par canal"
-              % (term, len(pats)))
+        # spec re-scan (v3, cf. docs/design_nested_scan.md) : la
+        # semantique evenementielle du futur circuit (compteur ancre a
+        # d_lam + pile d'INTG par niveau) reproduit les regles KEEP
+        # canal par canal sur les tokens gardes
+        d_lam = toks[K + 1][1]
+        skip = {j - (K + 2) for j in bound_abs}
+        spec = cw.rescan_body(rows[K + 2:body_end], d_lam, skip)
+        keep = [cw.body_slot(r, d_lam)
+                for j, r in enumerate(rows[K + 2:body_end]) if j not in skip]
+        assert spec == keep, (term, spec, keep)
+        print("  composition %-24s : %d slots + %d gardes, EXACT"
+              % (term, len(pats), len(spec)))
 
     # 3. differentiel moteur : Python == C
     loop = orc.ClosedLoop(living_cube=True, copy_engine="py", verbose=False)

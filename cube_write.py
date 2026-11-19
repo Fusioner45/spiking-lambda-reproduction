@@ -79,6 +79,83 @@ def body_slot(row, d_lam):
     return (self2[0], self2[1], b2[0], b2[1], cs.TY_VAR, 0, 0)
 
 
+def rescan_body(body_rows, d_lam, skip=()):
+    """Specification executable du re-scan neural du corps du redex
+    (v3, cf. docs/design_nested_scan.md). Sémantique événementielle du
+    futur circuit : un scan préfixe avec
+
+      - un compteur de profondeur ANCRE a d_lam (le lambda du redex a
+        disparu : le corps pendait a d_lam+1, il pend a d_lam) — le
+        decrement KEEP n'est PAS une operation sur les tokens, c'est
+        l'ancrage du scan ;
+      - une pile de niveaux ouverts, chacun avec son integrateur de
+        balance (VAR +1, APP -1, LAM 0) : un niveau ferme quand son
+        sigma franchit +1 (INTG_BODY §2.5, une instance par niveau —
+        c'est le sens de « SCAN imbriques ») ; la fermeture rend au
+        compteur la profondeur d'ouverture du niveau ;
+      - les VAR lies au redex sont SKIPPES (remplaces par l'argument
+        insere) : l'argument est un sous-terme complet, contribution
+        +1 au sigma de tous les niveaux ouverts — comme le VAR
+        remplace ; la balance du flux de sortie est preservee ;
+      - un VAR garde lit son binder sur la pile : le (n+1)-ieme LAM
+        depuis le sommet, a sa profondeur d'ouverture (deja decremente
+        par l'ancrage) ; binder hors du corps (pas assez de LAMs dans
+        la pile) : canaux BIND source inchanges ;
+      - un VAR libre garde le code reserve (7,7) et emet son indice
+        decremente d'un niveau d'environnement (port libre du
+        contexte).
+
+    Renvoie les patterns 7 canaux des tokens gardes, dans l'ordre du
+    scan. Le circuit neural (compteur + pile d'INTG) sera juge
+    spike-a-spike contre cette specification."""
+    cur = d_lam
+    stack = [["BODY", d_lam, 0]]           # (kind, depth_at_open, sigma)
+    out = []
+    for pos, row in enumerate(body_rows):
+        tid, d, _sf, _sc, bf, bc, libre = row
+        if pos in skip:
+            for lv in stack:               # l'argument insere : +1
+                lv[2] += 1
+        else:
+            sf_n, sc_n = cur % 8, (cur // 8) % 8
+            if tid == bd.LAM:
+                out.append((sf_n, sc_n, 0, 0, cs.TY_LAM, 0, 0))
+                stack.append(["LAM", cur, 0])
+                cur += 1
+            elif tid == bd.APP:
+                for lv in stack:           # l'APP : -1 partout ou il est
+                    lv[2] -= 1
+                out.append((sf_n, sc_n, 0, 0, cs.TY_APP, 0, 0))
+                stack.append(["APP", cur, -1])
+            else:
+                n = tid - 4
+                if libre:
+                    n2 = _dec((n % 8, (n // 8) % 8))
+                    pat = (sf_n, sc_n, 7, 7, cs.TY_VAR, n2[0], n2[1])
+                else:
+                    b_new = None
+                    lam_seen = 0
+                    for lv in reversed(stack):
+                        if lv[0] == "LAM":
+                            if lam_seen == n:
+                                b_new = lv[1]
+                                break
+                            lam_seen += 1
+                    if b_new is None:      # binder hors du corps
+                        pat = (sf_n, sc_n, bf, bc, cs.TY_VAR, 0, 0)
+                    else:
+                        pat = (sf_n, sc_n, b_new % 8, (b_new // 8) % 8,
+                               cs.TY_VAR, 0, 0)
+                for lv in stack:           # le VAR : enfant complet, +1
+                    lv[2] += 1
+                out.append(pat)
+        while stack and stack[-1][2] == 1: # fermetures en cascade
+            cur = stack.pop()[1]
+    assert not stack, "le corps entier doit se fermer au dernier token"
+    assert len(out) == len(body_rows) - len(skip)
+    return out
+
+
 def arg_slot(ring, row_arg, sh, d_arg_root):
     """Slot destination d'un token de l'ARGUMENT insere a la place d'un
     VAR lie : self +sh par le ring ; bind +sh si le binder est interne
