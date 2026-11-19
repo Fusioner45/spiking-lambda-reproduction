@@ -31,6 +31,11 @@ PERSIST/GATE/SCAN orchestration.
   engines.
 * Scale: chains of nested identities up to 449 tokens and 149 reduction
   steps; the C core runs the full closed loop in 1.2 s.
+* Living cube: the next cube is written slot by slot by the STDP copy
+  circuits (one copy channel per slot, 7 phase channels per token) and
+  read back through recall dynamics. Corrupting one learned weight
+  stops the reduction, which shows the state really flows through the
+  memories (`run_cube.py`).
 
 See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and
@@ -51,6 +56,7 @@ Python 3.8+, standard library only.
 ```
 python run_demo.py        # lambda oracle + LIF/STDP primitives
 python run_loop.py        # closed-loop Algorithm 1 on real terms
+python run_cube.py        # closed loop with the STDP-written living cube
 python run_robustness.py  # the paper's validation blocks
 python run_noise.py       # Monte-Carlo noise study of the binding circuit
 ```
@@ -75,6 +81,7 @@ python run_snn_core.py    # differential test: Python engine vs C engine
 | `bind_gamma.py` | theta-gamma binding circuit, Section 2.6 (+ noise / FREE_F options) |
 | `ring_phase.py` | phase-ring De Bruijn arithmetic, Section 2.7 |
 | `copy_stdp.py` | one-shot theta-cycle STDP copy, Section 2.8 |
+| `cube_state.py` | the next cube as live STDP state: one copy channel per slot, recall-based readout |
 | `persist_gate.py` | PERSIST / GATE / SCAN, Sections 2.9-2.10 |
 | `free_vars_fix.py` | reserved phase code for free variables (fix for Section 3.3) |
 | `orchestrate.py` | closed-loop Algorithm 1 with topographic event assembly |
@@ -95,20 +102,29 @@ This reproduction follows the same split:
   theta-cycle STDP copying, and the PERSIST/GATE/SCAN orchestration.
   Each circuit is validated against a symbolic oracle in isolation.
 * **In Python (the meta-controller)** — cube initialisation, event
-  collection and topographic ordering, term re-encoding between
-  reduction steps, and the per-step oracle comparison.
+  collection and topographic ordering, and the per-step oracle
+  comparison.
 
-**Known gap vs the paper.** In the authors' implementation, the STDP
-copy circuits write the next working-memory cube directly: the cube is
-the live state of the reducer. In this reproduction, the copy circuits
-are validated per pattern while the cube update goes through a symbolic
-re-encoding. Closing that gap (making the STDP-written cube the actual
-state) is the next architectural step, together with replacing the
-remaining symbolic event assembly with nested SCAN circuits.
+**The cube as live state.** With `living_cube=True` (used by
+`run_cube.py`), the next cube is written slot by slot by the STDP copy
+circuits and read back through recall dynamics: the tokens consumed by
+the next reduction step come out of the copy memories, not out of a
+symbolic re-encoding. Each slot stores 7 phase channels: the 4 paper
+channels (self and binder phases), a type channel (the paper carries
+token identity on distinct populations, Section 2.1), and 2 channels
+for the free-variable index; for bound variables the index is already
+recoverable from the binder channels (n = d - 1 - b). Any silent
+channel is detected at readout, so a corrupted memory stops the loop
+instead of silently corrupting the reduction.
+
+**Remaining gap vs the paper.** The write addressing (which slot
+receives which token, the topographic sort of Section 2.10.3) is still
+the Python meta-controller, as in the paper's own boundary. Replacing
+it with nested SCAN circuits is the next architectural step.
 
 ## Status and limits
 
-All 13 validation banks pass. Known limits, documented in the note:
+All 16 validation banks pass. Known limits, documented in the note:
 the balance counter drifts on subterms longer than ~30 tokens (a
 tau_m >= 1000 ms fix is included), and the binding circuit has a
 measured sensitivity to one-bit phase noise (see the noise study).

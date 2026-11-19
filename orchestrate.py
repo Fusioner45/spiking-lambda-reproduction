@@ -14,6 +14,9 @@ net.step(dt)... reads the result after HALT ») :
       5. patterns  <- copie theta-cycle STDP (§2.8), par token emis
   - l'ASSEMBLAGE des evenements de sortie (§2.10.3) est symbolique
     (tri topographique par position d'entree, comme chez les auteurs).
+  - Option living_cube (cf. cube_state.py) : le prochain cube est
+    ECRIT slot par slot par les copies STDP et LU par rappel — l'etat
+    vit dans les memoires au lieu d'etre re-encode symboliquement.
 
 Regles d'assemblage (le piege signale par Gemini, §2.10.3 shift_bind) :
   - jetons du CORPS conserves (KEEP) : profondeur -1 (le lambda du redex
@@ -37,6 +40,7 @@ import intg_body
 import bind_gamma
 import ring_phase
 import copy_stdp
+import cube_state
 import snn_core
 
 RESERVED_FINE = 7                  # code (7,7) des libres (notre fix)
@@ -102,11 +106,17 @@ class ClosedLoop:
     circuits reels, verifiee etape par etape contre l'oracle."""
 
     def __init__(self, verify_copy=True, verbose=True, net_factory=None,
-                 copy_engine="py", production=False, intg_tau_m=300.0):
+                 copy_engine="py", production=False, intg_tau_m=300.0,
+                 living_cube=False):
         self.verify_copy = verify_copy
         self.verbose = verbose
         self.net_factory = net_factory
         self.copy_engine = copy_engine
+        # cube vivant : le prochain cube est ECRIT par les copies STDP
+        # (un canal par slot, §2.8) et LU par rappel — l'etat passe par
+        # les memoires au lieu du re-encodage symbolique (chantier
+        # revue ChatGPT, cf. cube_state.py)
+        self.living_cube = living_cube
         self.intg_tau_m = intg_tau_m
         # mode production : sans comparaison oracle a chaque etape (la
         # correction du rewrite est deja etablie par la batterie ; ici on
@@ -200,6 +210,20 @@ class ClosedLoop:
         self._check_copy(emitted)
         rep["n_copied_patterns"] = len(emitted)
         rep["n_out"] = len(new_toks)
+        # 6. cube vivant : chaque slot du prochain cube est ECRIT par
+        #    sa copie STDP (§2.8) et LU par rappel — l'etat effectif
+        #    passe par les memoires, pas par le symbole (un canal muet
+        #    ou corrompu casse l'assertion : le cube est porteur)
+        if self.living_cube:
+            new_rows = fv.rows_fix(bd.tokens_to_db(new_toks))
+            assert [(r[0], r[1]) for r in new_rows] == new_toks
+            cube = cube_state.CubeState(engine=self.copy_engine)
+            for s, row in enumerate(new_rows):
+                cube.write(s, cube_state.slot_pattern_from_row(row))
+            read_toks = cube.read_all()
+            assert read_toks == new_toks, rep   # memoire fidele sinon stop
+            rep["cube_slots"] = len(cube.slots)
+            new_toks = read_toks                # l'ETAT vient du cube
         # reconstruction du terme (NOTRE boucle, pas l'oracle)
         nxt = bd.from_debruijn(bd.tokens_to_db(new_toks))
         return nxt, rep
