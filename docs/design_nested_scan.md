@@ -83,12 +83,19 @@ a differential bench: the composed cube (v2) must remain exactly equal.
 
 ## 3. Milestones
 
-* v3a (1 session): executable specification + first circuit. The spec
-  `rescan_body` (event semantics above) is done and validated (60 kept
-  tokens exact against the KEEP rules, bank-extended). Remaining: the
-  neural depth counter and per-level INTG stack, calibrated at
-  tau_m >= 1000 ms / W_CNT = 1/epsilon(tau_m, 1), validated
-  spike-to-spike against the spec on the same battery.
+* v3a (1 session): executable specification + first circuit. DONE.
+  The spec `rescan_body` (event semantics) is validated (60 kept tokens
+  exact against the KEEP rules), and the neural INTG stack
+  (`rescan_circuit.py`, one LIF integrator per open level,
+  tau_m = 1000 ms / W_CNT = 1/epsilon(tau_m, 1)) is validated
+  token-by-token against the spec on the 8-term battery: 64 kept
+  tokens exact. Simultaneous level closures (several integrators
+  crossing +1 on the same slot, e.g. APP f (APP x y)) sum correctly:
+  each stack neuron projects independently, up to 6 closures observed
+  on one slot. Remaining honest boundary: the gating (which INTG
+  receives the pulses) is carried by selective port injection, same
+  status as the paper's Section 2.11 injections; neural synaptic
+  gating is v3b.
 * v3b (1 session): neural free-index port and binder stack readout;
   wire the re-scan into `compose_cube` behind a flag; differential
   against v2 canal by canal; 16 banks stay green.
