@@ -99,6 +99,23 @@ a differential bench: the composed cube (v2) must remain exactly equal.
 * v3b (1 session): neural free-index port and binder stack readout;
   wire the re-scan into `compose_cube` behind a flag; differential
   against v2 canal by canal; 16 banks stay green.
+  * v3b-1 DONE: the cut-off is now carried by the neuron dynamics
+    themselves -- global VAR/APP ports feed every INTG, and a closed
+    level enters a long post-discharge refractory period (t_ref
+    covering the rest of the scan) that makes it deaf to further
+    pulses. Every INTG fires at most once (bank-verified); the global
+    mode reproduces the selective-mode traces exactly on the full
+    battery (16 steps / 64 tokens). Remaining honest boundary: the
+    wiring (which INTG is connected to the global ports) still happens
+    at push time, same status as Section 2.11 initialization.
+  * Open question for v3b-2: the paper's PERSIST/GATE gate (Section
+    2.9) assumes PERSIST levels pre-armed before the scan -- its
+    tonic PERSIST->GATE filter rises in tau_syn = 20 ms (2.5 slots),
+    too slow for dynamically-pushed levels that live 1-2 slots.
+    Options: pre-created pool + warmup, dynamic weights, or a faster
+    tonic filter with re-checked margins. The binder readout (each
+    LAM level's anchored depth read off the active stack top, the
+    levels below inhibited) rides on the same PERSIST structure.
 * v3c (1 session): remove `body_slot`'s channel-level KEEP rule from
   the meta-controller; the decrement is now fully neural. The boundary
   note moves to "output ordering only" (the paper's own boundary).

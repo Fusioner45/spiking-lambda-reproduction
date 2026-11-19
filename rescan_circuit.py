@@ -22,9 +22,17 @@ Semantique (miroir exact de rescan_body) :
   - la profondeur courante = d_lam + nombre de LAM ouverts : le
     compteur est ANCRE a d_lam, le decrement KEEP est l'ancrage.
 
-Frontiere honnete : le gating (quels INTG recoivent les pulses) est
-porte par l'injection selective par ports, meme statut que les
-injections §2.11 du papier ; le gating synaptique neural est la v3b.
+Frontiere honnete (v3b-1) : l'injection est GLOBALE — un port VAR et un
+port APP pour tous les INTG, connectes au push — et la COUPURE d'un
+niveau ferme est portee par la dynamique du neurone lui-meme : au
+discharge, l'INTG entre en refractaire long (t_ref couvrant le reste du
+scan) et devient sourd a tout pulse suivant (chaque INTG decharge donc
+au plus UNE fois — le banc le verifie). Le gating synaptique complet
+PERSIST/GATE (la proposition §2.9 : la porte tenue par le PERSIST du
+niveau, coupee par le discharge) demande des niveaux pre-creees avec
+warmup ou des poids dynamiques : le tonique PERSIST->GATE du papier
+monte en tau_syn=20 ms (2,5 slots), trop lent pour nos niveaux
+dynamiques de 1-2 slots — question ouverte pour la v3b-2.
 """
 
 import snn_engine as se
@@ -32,16 +40,24 @@ import snn_engine as se
 SLOT_MS = 8.0
 DT = 0.1
 
+PV_GLOBAL, PA_GLOBAL = 100, 101            # ports VAR/APP globaux (v3b-1)
+
 
 class RescanStack:
-    """Pile d'INTG LIF pour le re-scan du corps du redex."""
+    """Pile d'INTG LIF pour le re-scan du corps du redex.
+
+    gating='selective' (v3a) : ports par niveau, injection selective.
+    gating='global' (v3b-1) : ports globaux, tous les INTG connectes au
+    push, coupure par refractaire long au discharge."""
 
     def __init__(self, d_lam, tau_m=1000.0, slot_ms=SLOT_MS, dt=DT,
-                 net_factory=None):
+                 net_factory=None, gating="global", max_tokens=64):
         self.d_lam = d_lam
         self.slot_ms = slot_ms
         self.dt = dt
         self.tau_m = tau_m
+        self.gating = gating
+        self.max_tokens = max_tokens
         self.eps = se.measure_epsilon(tau_m, 1.0, dt)
         self.w_cnt = 1.0 / self.eps          # eq. (8) : 1 pulse = 1 unite
         self.net = (net_factory or se.Network)(dt)
@@ -52,19 +68,31 @@ class RescanStack:
         self._push("BODY")                   # le corps lui-meme
 
     def _add_intg(self):
+        t_ref = 0.1
+        if self.gating == "global":
+            # refractaire long : au discharge, le neurone devient sourd
+            # jusqu'a la fin du scan (slot_ms par token + marge)
+            t_ref = self.slot_ms * (self.max_tokens + 2)
         if isinstance(self.net, se.Network):
-            return self.net.add(se.Neuron(tau_m=self.tau_m, t_ref=0.1,
+            return self.net.add(se.Neuron(tau_m=self.tau_m, t_ref=t_ref,
                                           dt=self.net.dt))
-        return self.net.add(self.tau_m, 0.1)
+        return self.net.add(self.tau_m, t_ref)
 
     def _push(self, kind):
         k = len(self.all)
         lv = {"kind": kind, "depth": None, "intg": self._add_intg(),
-              "pv": 100 + 2 * k, "pa": 101 + 2 * k, "active": True}
-        self.net.connect(lv["pv"], lv["intg"], +self.w_cnt,
-                         delay_ms=0.5, tau_syn=1.0)
-        self.net.connect(lv["pa"], lv["intg"], -self.w_cnt,
-                         delay_ms=0.5, tau_syn=1.0)
+              "pv": 100 + 2 * k, "pa": 101 + 2 * k, "active": True,
+              "closes": 0}
+        if self.gating == "global":
+            self.net.connect(PV_GLOBAL, lv["intg"], +self.w_cnt,
+                             delay_ms=0.5, tau_syn=1.0)
+            self.net.connect(PA_GLOBAL, lv["intg"], -self.w_cnt,
+                             delay_ms=0.5, tau_syn=1.0)
+        else:
+            self.net.connect(lv["pv"], lv["intg"], +self.w_cnt,
+                             delay_ms=0.5, tau_syn=1.0)
+            self.net.connect(lv["pa"], lv["intg"], -self.w_cnt,
+                             delay_ms=0.5, tau_syn=1.0)
         self.levels.append(lv)
         self.all.append(lv)
         return lv
@@ -84,20 +112,33 @@ class RescanStack:
             lv = self._push("LAM")           # 0 partout, compteur +1 apres
             lv["depth"] = cur
         elif kind == "APP":
-            for lv in self.levels:           # -1 a tous les niveaux ouverts
+            if self.gating == "global":
+                lv = self._push("APP")       # connecte AVANT le pulse :
+                lv["depth"] = cur            # il recoit son -1 initial
+                self.net.inject_spike(PA_GLOBAL, t0)
+            else:
+                for lv in self.levels:       # -1 a tous les niveaux ouverts
+                    self.net.inject_spike(lv["pa"], t0)
+                lv = self._push("APP")       # son INTG demarre a -W
+                lv["depth"] = cur
                 self.net.inject_spike(lv["pa"], t0)
-            lv = self._push("APP")           # son INTG demarre a -W
-            lv["depth"] = cur
-            self.net.inject_spike(lv["pa"], t0)
         else:                                # VAR ou SKIP : +1 partout
-            for lv in self.levels:
-                self.net.inject_spike(lv["pv"], t0)
-        # simuler exactement un slot ; les decharges = fermetures
+            if self.gating == "global":
+                self.net.inject_spike(PV_GLOBAL, t0)
+            else:
+                for lv in self.levels:
+                    self.net.inject_spike(lv["pv"], t0)
+        # simuler exactement un slot ; toute decharge d'un niveau OUVERT =
+        # fermeture (les decharges des niveaux deja fermes ne doivent pas
+        # exister : le refractaire long rend le niveau sourd — le banc
+        # le verifie avec lv["closes"])
+        by_intg = {lv["intg"]: lv for lv in self.all}
         closed = []
         for _tms, idx in self.net.bulk_run(int(round(self.slot_ms / self.dt))):
-            for lv in self.levels:
-                if lv["intg"] == idx:
-                    closed.append(lv)
+            lv = by_intg[idx]
+            lv["closes"] += 1
+            if lv in self.levels:
+                closed.append(lv)
         for lv in closed:                    # sommation des simultanees
             lv["active"] = False
             self.levels.remove(lv)

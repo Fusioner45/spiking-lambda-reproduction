@@ -1,8 +1,15 @@
 # -*- coding: utf-8 -*-
-r"""Banc v3a : la pile d'INTG LIF du re-scan (rescan_circuit.RescanStack)
-validee contre la specification executable rescan_body (cube_write.py)
-sur la batterie — le futur circuit sera juge spike-a-spike contre cette
-spec, comme le moteur C contre son prototype Python.
+r"""Banc v3a+v3b-1 : la pile d'INTG LIF du re-scan
+(rescan_circuit.RescanStack) validee contre la specification executable
+rescan_body (cube_write.py) sur la batterie — le circuit est juge
+token-par-token contre cette spec, comme le moteur C contre son
+prototype Python.
+
+Deux modes de gating, traces identiques attendus :
+  - 'selective' (v3a) : ports par niveau, injection selective ;
+  - 'global' (v3b-1) : ports VAR/APP GLOBAUX connectes a tous les INTG
+    au push, coupure par refractaire long au discharge — chaque INTG
+    decharge au plus UNE fois (verifie).
 
 Calibrage : tau_m = 1000 ms / W_CNT = 1/epsilon(tau_m, 1) (finding n°8 :
 les niveaux externes de la pile restent sous le seuil pendant la
@@ -40,14 +47,13 @@ TERMS = [
 ]
 
 
-def main():
-    print("=" * 64)
-    print("PILE D'INTG DU RE-SCAN (v3a) - circuit LIF vs spec")
-    print("=" * 64)
-
+def run_battery(gating):
+    """Differentiel circuit vs spec sur toute la batterie. Renvoie
+    (total_steps, total_tokens, max_simul, max_closes)."""
     total_tokens = 0
     total_steps = 0
     max_simul = 0
+    max_closes = 0
     for term in TERMS:
         cur_term = lb.parse(term)
         for step in range(12):
@@ -68,7 +74,8 @@ def main():
             # spec (semantique evenementielle)
             spec = cw.rescan_body(body_rows, d_lam, skip)
             # circuit LIF : meme flux de tokens
-            stack = rc.RescanStack(d_lam)
+            stack = rc.RescanStack(d_lam, gating=gating,
+                                   max_tokens=len(body_rows))
             gi = 0
             for pos, row in enumerate(body_rows):
                 tid = row[0]
@@ -87,19 +94,43 @@ def main():
                         (term, step + 1, pos, cur, self_spec)
                     gi += 1
             assert stack.levels == [], (term, "BODY doit fermer au dernier")
+            for lv in stack.all:
+                assert lv["closes"] == 1, (term, gating, lv)
+                max_closes = max(max_closes, lv["closes"])
             max_simul = max(max_simul, stack.last_closures)
             total_tokens += len(spec)
             total_steps += 1
             cur_term, _ = lb.beta_step(cur_term)
-        print("  %-34s : %d etapes, profondeur exacte token par token"
-              % (term, step + 1))
+    return total_steps, total_tokens, max_simul, max_closes
+
+
+def main():
+    print("=" * 64)
+    print("PILE D'INTG DU RE-SCAN (v3a + v3b-1) - circuit LIF vs spec")
+    print("=" * 64)
+
+    # 1. v3a : injection selective par niveau
+    st, tk, simul, _c = run_battery("selective")
+    print("  v3a  selective : %d etapes, %d tokens, profondeur exacte ; "
+          "fermetures simultanees max = %d" % (st, tk, simul))
+
+    # 2. v3b-1 : injection GLOBALE + coupure par refractaire long :
+    #    chaque INTG decharge AU PLUS une fois (max_closes <= 1)
+    st2, tk2, simul2, mc = run_battery("global")
+    print("  v3b  global    : %d etapes, %d tokens, profondeur exacte ; "
+          "fermetures simultanees max = %d ; decharges/INTG = %d "
+          "(coupure OK)" % (st2, tk2, simul2, mc))
+    assert mc == 1, "le refractaire long doit rendre chaque INTG sourd \
+        apres son discharge"
+    assert (st, tk, simul) == (st2, tk2, simul2), "les deux modes doivent \
+        produire les memes traces"
 
     print()
     print("PILE RE-SCAN VALIDEE : %d etapes, %d tokens gardes, "
-          "profondeur exacte" % (total_steps, total_tokens))
+          "profondeur exacte dans les deux modes" % (st, tk))
     print("fermetures simultanees max observees sur un slot : %d "
-          "(sommee, pas « -1 par slot »)" % max_simul)
-    assert max_simul >= 3, "le cas limite des fermetures simultanees doit \
+          "(sommee, pas « -1 par slot »)" % simul)
+    assert simul >= 3, "le cas limite des fermetures simultanees doit \
         etre exerce par la batterie"
 
 
