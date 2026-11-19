@@ -58,7 +58,7 @@ python run_noise.py       # Monte-Carlo noise study of the binding circuit
 To enable the C engine:
 
 ```
-gcc -O2 -shared -fPIC -o snn_core.so snn_core.c -lm   # Linux/macOS
+gcc -O2 -shared -fPIC -o libsnn_core.so snn_core.c -lm  # Linux/macOS
 gcc -O2 -shared -o snn_core.dll snn_core.c -lm        # Windows
 python run_snn_core.py    # differential test: Python engine vs C engine
 ```

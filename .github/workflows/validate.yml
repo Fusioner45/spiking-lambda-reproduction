@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Compile the C core
-        run: gcc -O2 -shared -fPIC -o snn_core.so snn_core.c -lm
+        run: gcc -O2 -shared -fPIC -o libsnn_core.so snn_core.c -lm
 
       - name: Run validation banks
         run: |

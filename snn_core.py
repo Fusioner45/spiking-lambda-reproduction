@@ -11,7 +11,7 @@ import os
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _LIB = None
-for _name in ("snn_core.dll", "snn_core.so"):
+for _name in ("snn_core.dll", "libsnn_core.so", "snn_core.so"):
     _p = os.path.join(_DIR, _name)
     if os.path.exists(_p):
         _LIB = ctypes.CDLL(_p)
@@ -19,7 +19,7 @@ for _name in ("snn_core.dll", "snn_core.so"):
 if _LIB is None:
     raise ImportError(
         "snn_core not compiled. Run: "
-        "gcc -O2 -shared -fPIC -o snn_core.so snn_core.c -lm  "
+        "gcc -O2 -shared -fPIC -o libsnn_core.so snn_core.c -lm  "
         "(Linux/macOS) or gcc -O2 -shared -o snn_core.dll snn_core.c -lm "
         "(Windows).")
 _LIB.snn_create.restype = ctypes.c_void_p
