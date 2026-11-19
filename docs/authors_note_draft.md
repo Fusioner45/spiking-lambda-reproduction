@@ -149,8 +149,10 @@ would be useful for a v2.
 
 A self-contained Python implementation (standard library only) plus the
 bit-faithful C core, with one validation script per circuit and per
-block above, is available with this note. [REPO LINK]
+block above, is available at
+https://github.com/Fusioner45/spiking-lambda-reproduction
 
 ## Contact
 
-[YOUR NAME], [affiliation, email]
+Gautier Meranthe, BSc Cybersecurity Student, EPITA Paris
+https://github.com/Fusioner45
