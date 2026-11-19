@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+snn_core.dll
+snn_core.so
+_debug*
