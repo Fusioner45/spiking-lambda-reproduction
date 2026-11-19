@@ -45,6 +45,22 @@ top); a VAR bound outside (b < d_lam, not on the stack) keeps its
 source BIND channels unchanged. Free vars keep the reserved (7,7) code
 and emit the decremented index on the free channels.
 
+Two structural facts lock the design:
+
+* Balance is invariant under substitution. In prefix form every
+  well-formed subterm has a net balance of +1 (N_VAR - N_APP = +1),
+  exactly the contribution of the bound variable it replaces -- so the
+  output stream (kept body tokens and inserted argument copies
+  interleaved) preserves the nesting structure, and a single pass of
+  the INTG stack needs no exception routing for the insertions. This
+  is why the skipped redex-bound VARs contribute +1 in `rescan_body`.
+* Calibration reuses Finding n.8. The outer levels of the stack stay
+  held under threshold while the inner subterms are traversed -- the
+  exact regime where the paper's tau_m = 300 ms integrator drifts.
+  Calibrate the stack directly at tau_m >= 1000 ms with
+  W_CNT = 1/epsilon(tau_m, 1) (validated for the envelope fix, session
+  14 bis), not at the paper's 300 ms.
+
 ## 2. Open design question (to settle at implementation time)
 
 Where does the scan read its input from?
@@ -67,10 +83,11 @@ a differential bench: the composed cube (v2) must remain exactly equal.
 
 ## 3. Milestones
 
-* v3a (1 session): executable specification + first circuit. A symbol
-  spec `rescan_body` (event semantics above) checked against
-  `body_slot` on the whole battery; then the neural depth counter
-  (counter + per-level INTG stack, calibrated like INTG_BODY) validated
+* v3a (1 session): executable specification + first circuit. The spec
+  `rescan_body` (event semantics above) is done and validated (60 kept
+  tokens exact against the KEEP rules, bank-extended). Remaining: the
+  neural depth counter and per-level INTG stack, calibrated at
+  tau_m >= 1000 ms / W_CNT = 1/epsilon(tau_m, 1), validated
   spike-to-spike against the spec on the same battery.
 * v3b (1 session): neural free-index port and binder stack readout;
   wire the re-scan into `compose_cube` behind a flag; differential
