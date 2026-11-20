@@ -151,9 +151,18 @@ literal SRC-event count includes the routing relays (the same spikes
 arriving through gates in a physical realization -- the neural
 GATE_BOUND milestone would remove that term).
 
+**Ablations.** `run_ablation.py` disables one circuit at a time (DET,
+INTG, binding, phase ring, re-scan; the STDP copy is covered by the
+in-loop sabotage of `run_cube.py`): every ablation is CAUGHT by the
+structural cross-checks of the loop -- the reduction never computes a
+silently wrong result, it stops. Conversely, the neural paths and
+their symbolic references (KEEP rules, sequential copy, re-encoded
+state) produce identical traces: those switches are modes, not
+weakenings.
+
 ## Status and limits
 
-All 18 validation banks pass. Known limits, documented in the note:
+All 19 validation banks pass. Known limits, documented in the note:
 the balance counter drifts on subterms longer than ~30 tokens (a
 tau_m >= 1000 ms fix is included), and the binding circuit has a
 measured sensitivity to one-bit phase noise (see the noise study).

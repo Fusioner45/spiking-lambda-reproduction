@@ -109,8 +109,49 @@ def main():
     assert t1 == t2
     print("    traces identiques : %s" % t1)
 
+    # [bloc 9] numeriques a tau_m=1000 (fix finding n°8) : l'addition
+    # et la multiplication sur grands numeraux, traces exactes
+    print("  [bloc 9] numeriques a tau_m=1000 : addition/multiplication")
+    num = lambda k: "(\\f. \\x. " + "f (" * k + "x" + ")" * k + ")"
+    for a, b, want in [(2, 3, 5), (8, 8, 16), (9, 8, 17), (16, 16, 32)]:
+        loop = orc.ClosedLoop(verbose=False, intg_tau_m=1000.0)
+        nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, num(a), num(b)),
+                                max_steps=12)
+        got = lb.church_to_int(nf)
+        assert got == want, (a, b, got, want, trace)
+        print("    plus %-2d %-2d -> Church %-2d (%d etapes)"
+              % (a, b, got, len(trace) - 1))
+    loop = orc.ClosedLoop(verbose=False, intg_tau_m=1000.0)
+    nf, trace, _ = loop.run("(%s) (%s) (%s)" % (mult, num(5), num(5)),
+                            max_steps=14)
+    got = lb.church_to_int(nf)
+    assert got == 25, (got, trace)
+    print("    mult %-2d %-2d -> Church %-2d (%d etapes)"
+          % (5, 5, got, len(trace) - 1))
+
+    # [bloc 10] l'enveloppe tau_m=300 (finding n°8) est FALSIFIABLE :
+    # 8+8 passe encore, 9+8 est REFUSE par la verification oracle (la
+    # boucle s'arrete au lieu de calculer faux) — la limite du papier
+    # devient un test, plus une anecdote de journal
+    print("  [bloc 10] enveloppe tau_m=300 (finding n°8) : 8+8 passe,")
+    loop300 = orc.ClosedLoop(verbose=False, intg_tau_m=300.0)
+    nf, trace, _ = loop300.run("(%s) (%s) (%s)" % (plus, num(8), num(8)))
+    assert lb.church_to_int(nf) == 16
+    print("    plus 8  8 -> Church 16 (dans l'enveloppe) OK")
+    loop300 = orc.ClosedLoop(verbose=False, intg_tau_m=300.0)
+    try:
+        loop300.run("(%s) (%s) (%s)" % (plus, num(9), num(8)))
+        raise AssertionError("l'enveloppe tau_m=300 n'a pas tenu (9+8 passe "
+                             "hors enveloppe : regression finding n°8)")
+    except AssertionError as _e:
+        if "l'enveloppe tau_m=300 n'a pas tenu" in str(_e):
+            raise
+    print("    plus 9  8 -> REFUSE par la verification oracle (hors")
+    print("    enveloppe : le compteur derive) OK — la boucle ne calcule")
+    print("    jamais faux, elle s'arrete.")
+
     print()
-    print("BATTERIE DE ROBUSTESSE VERTE (7 blocs, ~20 termes).")
+    print("BATTERIE DE ROBUSTESSE VERTE (10 blocs, ~25 termes).")
 
 
 if __name__ == "__main__":
