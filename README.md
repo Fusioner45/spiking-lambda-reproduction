@@ -131,6 +131,18 @@ already recoverable from the binder channels (n = d - 1 - b). Any
 silent channel is detected at readout, so a corrupted memory stops the
 loop instead of silently corrupting the reduction.
 
+**Multiplexed argument copies (Section 4.5).** With
+`multiplexed=True` (the production default), writing the argument into
+the cube no longer costs one full copy per bound occurrence: a single
+chain of shared theta windows (one per argument token) serves ALL
+occurrences at once — every destination bank learns its ring-routed
+pattern during the same windows (emission cost `l_arg` instead of
+`n_bound x l_arg`; the per-slot memory is unchanged, slots are
+addresses). The per-tap routing stays on the real phase ring, the tap
+gating remains meta-controller (the Section 2.11 boundary), and the
+differential benches prove the tapped weights are bit-exact against
+direct writes and invariant under tap interleaving, on both engines.
+
 ## Status and limits
 
 All 17 validation banks pass. Known limits, documented in the note:

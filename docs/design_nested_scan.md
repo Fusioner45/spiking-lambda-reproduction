@@ -174,6 +174,33 @@ cube slots (same recall readout as v1); m2, the invariance proof as a
 differential bench (taps in all orders, slot contents identical); m3,
 complexity measurement n_bound x l_arg -> l_arg on the scale family.
 
+m1/m2/m3 DONE (session 25). `cube_multiplex.py`: the chain is ONE
+sequence of shared theta windows (one per argument token, 6 cycles
+each) during which ALL tap banks learn their ring-routed pattern in
+parallel — emission cost l_arg windows instead of n_bound x l_arg
+(`count_emissions`); the memory (one STDP bank per destination slot)
+is unchanged by construction (slots are addresses). The tap routing
+raw -> shifted is carried by the real ring (the same `arg_slot` /
+`ring_shift` the composition uses); the gating (which tap listens in
+which window) remains meta-controller (Section 5 boundary). m1
+differential: tapped banks' weights are BIT-EXACT against direct v1
+writes and the readout is faithful, on both engines (py and C); m2:
+weights AND recall spike times are invariant under 4 tap orders
+(2 random permutations), per slot, canal by canal; m3: measured
+emission gains 1.9x (x^2) to 6.1x (x^8, Church-8) on the
+(\x. x^n) (numeral k) family. The multiplexed write is the production
+default (`orchestrate.multiplexed=True`); the closed loops run it
+end-to-end with the per-step filet assert.
+
+Latent bug found and fixed on the way (probe, not review): CopyC
+(snn_core.py) scheduled learn/recall events at ABSOLUTE steps from
+zero and its recall read the WHOLE spike log since creation — the
+"C recall" was actually reading the learn-phase spikes, which only
+worked because the content coincides. `CopyC` now tracks its own
+clock (_k), schedules relative to it, and reads only the recall
+window's spikes; a n_steps_alloc parameter was added (the chain needs
+l_arg x 720 steps of event capacity).
+
 ## 5. Honest boundaries throughout
 
 After v3: the meta-controller owns output ordering only (same as the

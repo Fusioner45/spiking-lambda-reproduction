@@ -44,6 +44,7 @@ import bind_gamma
 import ring_phase
 import copy_stdp
 import cube_state
+import cube_multiplex
 import cube_write
 import snn_core
 
@@ -111,7 +112,8 @@ class ClosedLoop:
 
     def __init__(self, verify_copy=True, verbose=True, net_factory=None,
                  copy_engine="py", production=False, intg_tau_m=300.0,
-                 living_cube=False, neural_keep=True):
+                 living_cube=False, neural_keep=True, multiplexed=True,
+                 bank_hook=None):
         self.verify_copy = verify_copy
         self.verbose = verbose
         self.net_factory = net_factory
@@ -128,6 +130,16 @@ class ClosedLoop:
         # voie symbolique, reference du differentiel). Seule exception :
         # l'indice -1 des VAR libres, cf. cube_write.py.
         self.neural_keep = neural_keep
+        # item 3 (m1) : la copie de l'argument est MULTIPLEXEE — une
+        # seule chaine d'emission theta (l_arg fenetres) sert tous les
+        # taps (n_bound occurrences) au lieu de n_bound x l_arg emissions
+        # (cube_multiplex.py ; le routage par tap reste porte par le
+        # ring reel). multiplexed=False remet l'ecriture directe v1.
+        self.multiplexed = multiplexed
+        # hook banc (apres apprentissage de chaque banc de copie) —
+        # le sabotage in-loop du banc cube passe par la sur le chemin
+        # multiplexe (la chaine ne passe pas par write())
+        self.bank_hook = bank_hook
         self.intg_tau_m = intg_tau_m
         # mode production : sans comparaison oracle a chaque etape (la
         # correction du rewrite est deja etablie par la batterie ; ici on
@@ -244,8 +256,18 @@ class ClosedLoop:
                 assert slot_pats == [
                     cube_state.slot_pattern_from_row(r) for r in new_rows], rep
             cube = cube_state.CubeState(engine=self.copy_engine)
-            for s, pat in enumerate(slot_pats):
-                cube.write(s, pat)
+            if self.multiplexed and bound_sh:
+                # item 3 (m1) : UNE chaine d'emission pour l'argument,
+                # tous les taps (occurrences) apprennent en parallele —
+                # l_arg fenetres au lieu de n_bound x l_arg emissions
+                cube = cube_multiplex.build_cube(
+                    slot_pats,
+                    *cube_multiplex.arg_chain_plan(
+                        rows, K, l_body, l_arg, bound_sh),
+                    engine=self.copy_engine, bank_hook=self.bank_hook)
+            else:
+                for s, pat in enumerate(slot_pats):
+                    cube.write(s, pat)
             read_toks = cube.read_all()
             assert read_toks == new_toks, rep   # memoire fidele sinon stop
             rep["cube_slots"] = len(cube.slots)

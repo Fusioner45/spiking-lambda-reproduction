@@ -31,6 +31,8 @@ import orchestrate as orc
 import copy_stdp
 import intg_body
 import bind_gamma
+import random
+import cube_multiplex as cm
 
 two = "\\f. \\x. f (f x)"
 three = "\\f. \\x. f (f (f x))"
@@ -112,6 +114,94 @@ def main():
               "(KEEP symbolique + re-scan NEURAL, canal par canal)"
               % (term, len(pats), len(spec)))
 
+    # 2b. MULTIPLEXAGE (item 3, §4.5 — m1+m2) : UNE chaine d'emission
+    #     pour l'argument, tous les taps apprennent en parallele ;
+    #     differentiel poids bit-exact contre l'ecriture directe v1 et
+    #     invariance de l'ordre des taps, sur les deux moteurs
+    for term_mx in ("(\\x. x x) (\\f. \\x. f (f x))",
+                    "(\\x. x (x (x y))) (\\f. \\x. f x)"):
+        cur = lb.parse(term_mx)
+        db = bd.to_debruijn(cur)
+        toks = bd.to_tokens(db)
+        rows = fv.rows_fix(db)
+        K = bd.find_redex(cur)
+        l_body = intg_body.IntgCircuit(toks, K).run()["pos"] + 1
+        l_arg = intg_body.IntgCircuit(toks, K + l_body).run()["pos"] + 1
+        body_end = K + 2 + l_body
+        bound_abs = bind_gamma.truth_bound_indices(rows, K, body_end)
+        bound_sh = {j: toks[j][1] - 1 - toks[K][1] for j in bound_abs}
+        ring_mx = orc.ring_phase.PhaseRing()
+        pats = cw.compose_cube(toks, rows, K, l_body, l_arg, bound_sh,
+                               ring_mx)
+        raw, groups = cm.arg_chain_plan(rows, K, l_body, l_arg, bound_sh)
+        assert groups, ("pas d'occurrence liee", term_mx)
+        n_arg = len(raw) * len(groups)
+        for engine in ("py", "c"):
+            cube = cm.build_cube(pats, raw, groups, engine=engine)
+            assert cube.read_all() == orc.rewrite(
+                toks, rows, K, l_body, l_arg, bound_sh), \
+                (engine, "lecture multiplexe infidele")
+            for s, pat in enumerate(pats):     # poids TAPS == directs
+                direct = cm._new_bank(engine, s)
+                cm.learn_direct(direct, pat)
+                assert cm.bank_weights(cube.slots[s][1]) == \
+                    cm.bank_weights(direct), \
+                    (engine, "poids slot %d differents du v1" % s)
+        # m2 : invariance — 4 ordres de taps (dont 2 permutations au
+        # hasard), poids ET temps de spike du rappel identiques
+        arg_slots = sorted(s for start, _sh in groups
+                           for s in range(start, start + len(raw)))
+        base_w, base_f = {}, {}
+        for perm_i in range(4):
+            taps = list(zip(arg_slots, [pats[s] for s in arg_slots]))
+            if perm_i:
+                rnd = random.Random(perm_i)
+                rnd.shuffle(taps)
+            banks = cm.run_chain(raw, taps, engine="py")
+            for s in arg_slots:
+                w = tuple(cm.bank_weights(banks[s]))
+                f = tuple(sorted((k, tuple(t)) for k, t in
+                                 banks[s].recall(
+                                     cs.pattern_bits(pats[s])).items()))
+                if perm_i == 0:
+                    base_w[s], base_f[s] = w, f
+                else:
+                    assert w == base_w[s], (perm_i, "poids slot %d" % s)
+                    assert f == base_f[s], (perm_i, "spikes slot %d" % s)
+        print("  multiplexe %-28s : %d slots dont %d taps, poids + "
+              "rappel EXACTS (m1) et invariants a l'ordre des taps (m2)"
+              % (term_mx, len(pats), n_arg))
+
+    # 2c. m3 : la mesure n_bound x l_arg -> l_arg (famille (\x. x^n) (k))
+    print("  m3 : emissions d'ecriture v1 (directe) vs chaine multiplexee")
+    print("       %-22s %10s %10s %7s" % ("terme", "v1 slots", "chaine",
+                                         "gain"))
+    for n_occ, k_num in [(2, 2), (4, 4), (8, 4), (8, 8)]:
+        numeral = "(\\f. \\x. " + "f (" * k_num + "x" + ")" * k_num + ")"
+        term = "(\\x. " + " ".join(["x"] * n_occ) + ") " + numeral
+        cur = lb.parse(term)
+        db = bd.to_debruijn(cur)
+        toks = bd.to_tokens(db)
+        rows = fv.rows_fix(db)
+        K = bd.find_redex(cur)
+        # compteurs a tau_m=1000 (fix finding n°8) : les corps
+        # x^n dépassent l'enveloppe tau_m=300 desuite a n=8
+        l_body = intg_body.IntgCircuit(toks, K, tau_m=1000.0).run()["pos"] + 1
+        l_arg = intg_body.IntgCircuit(toks, K + l_body,
+                                      tau_m=1000.0).run()["pos"] + 1
+        body_end = K + 2 + l_body
+        bound_abs = bind_gamma.truth_bound_indices(rows, K, body_end)
+        bound_sh = {j: toks[j][1] - 1 - toks[K][1] for j in bound_abs}
+        ring_mx = orc.ring_phase.PhaseRing()
+        pats = cw.compose_cube(toks, rows, K, l_body, l_arg, bound_sh,
+                               ring_mx)
+        raw, groups = cm.arg_chain_plan(rows, K, l_body, l_arg, bound_sh)
+        v1, mux = cm.count_emissions(len(pats), len(raw) * len(groups),
+                                     len(raw))
+        assert mux < v1, (n_occ, k_num, v1, mux)
+        print("       (\\x. x^%-2d) Church-%-2d    %10d %10d %6.1fx"
+              % (n_occ, k_num, v1, mux, v1 / mux))
+
     # 3. differentiel moteur : Python == C
     loop = orc.ClosedLoop(living_cube=True, copy_engine="py", verbose=False)
     _nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three))
@@ -130,26 +220,20 @@ def main():
     except ValueError:
         print("  sabotage unite : canal muet DETECTE a la lecture")
 
-    # 4b. sabotage dans la boucle : l'etat corrompu arrete la reduction
-    _BaseCube = cs.CubeState             # classe reelle, avant le patch
+    # 4b. sabotage dans la boucle : l'etat corrompu arrete la reduction.
+    #     Chemin MULTIPLEXE (defaut) : la chaine ne passe pas par
+    #     write() pour les slots d'argument — la corruption passe par le
+    #     hook banc (le 3e banc appris, argument ou corps)
+    _n_banks = [0]
 
-    class _Sabotage(_BaseCube):
-        def __init__(self, engine="py"):
-            _BaseCube.__init__(self, engine)
-            self.n_writes = 0
+    def _sabotage_hook(bank, _slot, pattern):
+        _n_banks[0] += 1
+        if _n_banks[0] == 3 and hasattr(bank, "w"):
+            bank.w[8 * 4 + pattern[4]] = copy_stdp.W0   # canal TYPE demonte
 
-        def write(self, slot, pattern):
-            _BaseCube.write(self, slot, pattern)
-            self.n_writes += 1
-            if self.n_writes == 3:                 # un slot du 1er cube
-                _src, bb = self.slots[slot]
-                bb.w[8 * 4 + pattern[4]] = copy_stdp.W0
-
-    saved = cs.CubeState
-    cs.CubeState = _Sabotage
     try:
         loop = orc.ClosedLoop(living_cube=True, copy_engine="py",
-                              verbose=False)
+                              verbose=False, bank_hook=_sabotage_hook)
         loop.run("(%s) (%s)" % (two, eye))
         raise AssertionError("corruption in-loop NON detectee")
     except ValueError:
@@ -157,10 +241,10 @@ def main():
         # "NON detectee" rendait le test non falsifiable — si la boucle
         # allait au bout malgre la corruption, l'AssertionError devait
         # sortir et faire echouer le banc
-        print("  sabotage boucle : la reduction s'arrete a la corruption"
-              " — le cube est PORTEUR")
+        print("  sabotage boucle (multiplexe) : la reduction s'arrete a"
+              " la corruption — le cube est PORTEUR")
     finally:
-        cs.CubeState = saved
+        pass
 
     print()
     print("CUBE VIVANT VALIDE — l'etat de la boucle vit dans les memoires.")

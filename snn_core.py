@@ -146,30 +146,44 @@ def c_measure_epsilon(net_factory, tau_m, tau_syn, dt=0.1, duration_ms=40.0):
 
 
 class CopyC:
-    """Banc de copie STDP sur moteur C — miroir de copy_stdp.CopyBench."""
+    """Banc de copie STDP sur moteur C — miroir de copy_stdp.CopyBench.
 
-    def __init__(self, n=64, i_theta=0.75, dt=0.1):
+    L'horloge cote Python (_k, en pas) suit cp_run : les evenements SRC
+    sont programmes RELATIVEMENT a l'horloge reelle (revue du
+    multiplexage — avant, learn/recall planifiaient a partir de 0 en
+    absolu et recall lisait TOUT le log de spikes depuis la creation :
+    le « rappel » C lisait en realite les spikes du learn, ce qui ne
+    tenait que parce que le contenu coincide)."""
+
+    def __init__(self, n=64, i_theta=0.75, dt=0.1, n_steps_alloc=None):
         self.n = n
-        self.h = _LIB.cp_create(n, i_theta, dt,
-                                int(6 * 12.0 / dt) + int(30.0 / dt) + 128)
+        if n_steps_alloc is None:
+            n_steps_alloc = int(6 * 12.0 / dt) + int(30.0 / dt) + 128
+        self.h = _LIB.cp_create(n, i_theta, dt, n_steps_alloc)
         self.dt = dt
+        self._k = 0                              # horloge (pas)
 
     def learn(self, pattern, n_cycles=6):
         cycle_steps = int(12.0 / self.dt)
         offset = int(round(cs_offset / self.dt))
         for _c in range(n_cycles):
             for k in pattern:
-                _LIB.cp_schedule_src(self.h, k, _c * cycle_steps + offset)
+                _LIB.cp_schedule_src(
+                    self.h, k, self._k + _c * cycle_steps + offset)
             _LIB.cp_run(self.h, cycle_steps, 1)
+        self._k += n_cycles * cycle_steps
 
     def recall(self, pattern, duration_ms=30.0):
+        n0 = _LIB.cp_n_spikes(self.h)            # spikes AVANT le rappel
         for k in pattern:
-            _LIB.cp_schedule_src(self.h, k, int(round(1.0 / self.dt)))
+            _LIB.cp_schedule_src(
+                self.h, k, self._k + int(round(1.0 / self.dt)))
         _LIB.cp_run(self.h, int(duration_ms / self.dt), 0)
+        self._k += int(duration_ms / self.dt)
         n = _LIB.cp_n_spikes(self.h)
         st, k = ctypes.c_int(), ctypes.c_int()
         fired = {k2: [] for k2 in range(self.n)}
-        for i in range(n):
+        for i in range(n0, n):                   # spikes DU rappel seulement
             _LIB.cp_spike(self.h, i, ctypes.byref(st), ctypes.byref(k))
             fired[k.value].append((st.value + 1) * self.dt)
         return fired
@@ -179,6 +193,7 @@ class CopyC:
 
     def reset(self):
         _LIB.cp_reset(self.h)
+        self._k = 0
 
     def __del__(self):
         try:
