@@ -38,9 +38,20 @@ def rows_papier(db):
 
 def rows_fix(db):
     """Encodage repare : BIND=(7,7) pour une variable libre.
-    Les VAR lies sont inchanges (BIND = profondeur de leur binder)."""
+    Les VAR lies sont inchanges (BIND = profondeur de leur binder).
+
+    Garde de profondeur (revue externe) : les phases se replient modulo
+    64 et (7,7) est RESERVE aux libres — un token a la profondeur 63
+    (SELF=(7,7)) ou au-dela entrerait en collision avec les libres. La
+    limite documentee (profondeur utile 0..62 ; le papier teste <= 25
+    lambdas) est appliquee ici, au point d'entree unique de l'encodage."""
     out = []
     for (tid, d, sf, sc, bf, bc, libre) in bd.phase_table(db):
+        if d >= MAX_DEPTH:
+            raise ValueError(
+                "token a la profondeur %d >= %d : phases repliees modulo "
+                "64, collision avec le code libre (7,7) — borner le terme"
+                % (d, MAX_DEPTH))
         if libre and tid >= 4:
             bf, bc = RESERVED
         out.append((tid, d, sf, sc, bf, bc, libre))

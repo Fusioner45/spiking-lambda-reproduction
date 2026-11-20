@@ -55,7 +55,12 @@ def from_debruijn(t):
             n = t[1]
             if n < len(env):
                 return lb.Var(env[n])
-            return lb.Var(_FRESH[(n - len(env)) % len(_FRESH)] + "_f%d" % n)
+            # nom deduit du NIVEAU (n - len(env), invariant par
+            # abstraction) — le suffixe _f<n> brut dependait de la
+            # profondeur : une meme libre a deux profondeurs etait
+            # scindee en deux variables au round-trip (revue externe)
+            return lb.Var(_FRESH[(n - len(env)) % len(_FRESH)]
+                          + "_f%d" % (n - len(env)))
         if t[0] == "lam":
             base = _FRESH[len(env) % len(_FRESH)]
             name, k = base, 0

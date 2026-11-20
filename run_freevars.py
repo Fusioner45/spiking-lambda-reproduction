@@ -45,6 +45,18 @@ def main():
     print("  code reserve (7,7) : aucun lambda de profondeur 0..62 ne peut")
     print("  ne peut l'egaler ; il n'appartient qu'a d=63, bornee hors usage. OK")
 
+    # 1b. la garde de profondeur est APPLIQUEE (revue externe) : un token
+    #     a la profondeur 63 (SELF=(7,7)) ou au-dela est refuse
+    deep = "w"
+    for _ in range(64):                  # lambda le plus interne a d=63
+        deep = "(\\v. %s)" % deep
+    try:
+        fv.rows_fix(bd.to_debruijn(lb.parse(deep)))
+        raise AssertionError("garde de profondeur NON appliquee")
+    except ValueError:
+        print("  garde de profondeur : un lambda a d=63 est REFUSE "
+              "(collision (7,7) evitee) OK")
+
     # 2. cas buggues : lambda du redex a profondeur 0 + variables libres
     bug_cases = [
         "(\\x. x y) z",

@@ -3,8 +3,15 @@
 tokens, phases theta-gamma, detecteur Jeffress symbolique verifie contre
 l'oracle nominal du palier 1."""
 
+import sys
+
 import lambda_beta as lb
 import bridge_db as bd
+
+# console Windows cp1252 par defaut : les λ/ε des impressions planteraient
+# (revue externe) — forcer l'UTF-8 sur la sortie
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
 def trace_steps(t, n_max=12):
@@ -33,12 +40,32 @@ def main():
     tests = ["(\\x. x) y", "(\\x. \\y. x y) y", two_i,
              "(\\m. \\f. \\x. f (m f x)) (\\f. \\x. f (f x))"
              " (\\f. \\x. f (f (f x)))",
-             "(\\x. x x) (\\x. x x)"]
+             "(\\x. x x) (\\x. x x)",
+             "x (\\z. x)",                # une meme libre a 2 profondeurs
+             "(\\x. (x a) (\\y. a)) z"]   # revue externe : round-trip
     for s in tests:
         t = lb.parse(s)
         db = bd.to_debruijn(t)
         assert bd.to_debruijn(bd.from_debruijn(db)) == db
-    print("  aller-retour nominal <-> De Bruijn : OK (%d termes)" % len(tests))
+    # le nom d'une libre ne depend pas de la profondeur (revue externe) :
+    # les occurrences d'une meme libre gardent UN nom au round-trip
+    t = bd.from_debruijn(bd.to_debruijn(lb.parse("x (\\z. x)")))
+    frees = set()
+
+    def _free_names(u):
+        if isinstance(u, lb.Var):
+            if "_f" in u.name:
+                frees.add(u.name)
+        elif isinstance(u, lb.Abs):
+            _free_names(u.body)
+        else:
+            _free_names(u.func)
+            _free_names(u.arg)
+
+    _free_names(t)
+    assert len(frees) == 1, ("libre scindee en plusieurs noms", frees)
+    print("  aller-retour nominal <-> De Bruijn : OK (%d termes, "
+          "libres stables entre profondeurs)" % len(tests))
 
     # 2. aller-retour De Bruijn <-> tokens plats
     db = bd.to_debruijn(lb.parse(two_i))

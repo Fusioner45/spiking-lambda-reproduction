@@ -152,7 +152,11 @@ def main():
                               verbose=False)
         loop.run("(%s) (%s)" % (two, eye))
         raise AssertionError("corruption in-loop NON detectee")
-    except (ValueError, AssertionError):
+    except ValueError:
+        # except STRICT (revue externe) : avaler l'AssertionError du
+        # "NON detectee" rendait le test non falsifiable — si la boucle
+        # allait au bout malgre la corruption, l'AssertionError devait
+        # sortir et faire echouer le banc
         print("  sabotage boucle : la reduction s'arrete a la corruption"
               " — le cube est PORTEUR")
     finally:

@@ -26,6 +26,14 @@ def main():
     print("ITEM 4 - MOTEUR C + TEST DIFFERENTIEL")
     print("=" * 64)
 
+    # 0. regression (revue externe) : reset() AVANT tout run() ne doit
+    #    pas planter (bucket alloue seulement au premier run)
+    _net = sc.CNetwork(dt=0.1)
+    _net.add(2.0, 1.0)
+    _net.reset()                           # bucket NULL avant le fix
+    _net.run(10)
+    print("  reset() avant run() : survecu, puis run() nominal OK")
+
     # 1. calibration differentielle
     print("  epsilon : C vs Python (ecart max < 1e-12 attendu)")
     worst = 0.0

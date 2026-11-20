@@ -180,7 +180,12 @@ EXPORT void snn_run(Net *net, int n_steps) {
 EXPORT void snn_reset(Net *net) {
     net->k_step = 0;
     net->n_sp = 0;
-    memset(net->bucket, 0, (size_t)net->n_neur * MAX_TAU * sizeof(double));
+    /* bucket (et I) sont alloues au premier snn_run — un reset AVANT
+       tout run ne doit pas memset un pointeur NULL (revue externe :
+       access violation). Les champs deja alloues sont remis a zero. */
+    if (net->bucket) {
+        memset(net->bucket, 0, (size_t)net->n_neur * MAX_TAU * sizeof(double));
+    }
     for (int i = 0; i < net->n_neur; i++) {
         net->neur[i].v = 0.0;
         net->neur[i].t = 0.0;

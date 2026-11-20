@@ -24,6 +24,7 @@ Resultat honnete (finding n°9) :
 """
 
 import random
+import sys
 
 import lambda_beta as lb
 import bridge_db as bd
@@ -31,7 +32,16 @@ import free_vars_fix as fv
 import intg_body as ig
 import bind_gamma as bg
 
+# console Windows cp1252 par defaut : les λ/ε des impressions planteraient
+# (revue externe) — forcer l'UTF-8 sur la sortie
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+
 S = "(\\f. \\x. f (f (f x))) (\\x. x y)"   # 3 f lies + x (autre lieur) + y libre
+# 2e terme (revue externe) : une variable libre DANS le corps du redex
+# (g) — la protection (7,7) + inhibition FREE_F n'etait exercee que sur
+# des libres de l'ARGUMENT, jamais presentes au circuit de liaison
+S_BODY_FREE = "(\\f. f (g f)) h"           # 2 f lies + g libre (corps) + h libre
 
 
 def noisy_channels(rows, k, p, rng, decode="multi"):
@@ -64,11 +74,9 @@ def vars_of(rows, k):
             and r[0] >= 4]
 
 
-def main():
-    print("=" * 64)
-    print("BLOC 9 - BRUIT WM SUR LA LIAISON (avec inhibition FREE_F)")
-    print("=" * 64)
-
+def run_term(S, require_body_free=False):
+    """Bloc 9 sur UN terme : controle sans bruit + Monte-Carlo 40
+    tirages x {5 %, 10 %} x {multi, onehot}, proprietes robustes."""
     t = lb.parse(S)
     db = bd.to_debruijn(t)
     rows = fv.rows_fix(db)                     # encodage fixe (libres=(7,7))
@@ -83,6 +91,11 @@ def main():
     print("  terme : %s" % S)
     print("  VARs du corps : %d ; lies attendus : %s ; libres : %s"
           % (len(order), truth, free_idx))
+    if require_body_free:
+        # revue externe : ce terme doit presenter au moins une libre AU
+        # CIRCUIT (dans le corps du redex) — sans lui, la protection
+        # (7,7)+inhibition n'etait jamais exercee par ce banc
+        assert free_idx, ("pas de libre dans le corps", S)
 
     c0 = bg.BindCircuit(rows, k, body_end=body_end)
     r0 = c0.run()
@@ -126,14 +139,26 @@ def main():
             else:
                 assert n_fp == 0, (p, decode, n_fp)
 
+
+def main():
+    print("=" * 64)
+    print("BLOC 9 - BRUIT WM SUR LA LIAISON (avec inhibition FREE_F)")
+    print("=" * 64)
+
+    run_term(S)
+    print()
+    run_term(S_BODY_FREE, require_body_free=True)
+
     print()
     print("BLOC 9 : en presentation multi-bits, les proprietes robustes")
-    print("tiennent (0 manque, 0 libre marque) avec des faux lies minoritaires ;")
-    print("le decodage one-hot naif (WTA equilibre) supprime les faux lies mais")
-    print("provoque 75 % de manques a 10 % : CONTRE-PRODUCTIF (finding n°9 bis).")
-    print("La sensibilité au bruit de la liaison reste un probleme ouvert —")
-    print("pistes : majorite sur presentations repetees, hysteresis du WTA,")
-    print("ou ne jamais bruite le canal de lecture (choix implicite du papier).")
+    print("tiennent (0 manque, 0 libre marque) avec des faux lies minoritaires,")
+    print("Y COMPRIS avec une libre dans le corps du redex (presentee au")
+    print("circuit) ; le decodage one-hot naif (WTA equilibre) supprime les")
+    print("faux lies mais provoque 75 % de manques a 10 % : CONTRE-PRODUCTIF")
+    print("(finding n°9 bis). La sensibilité au bruit de la liaison reste un")
+    print("probleme ouvert — pistes : majorite sur presentations repetees,")
+    print("hysteresis du WTA, ou ne jamais bruite le canal de lecture (choix")
+    print("implicite du papier).")
 
 
 if __name__ == "__main__":
