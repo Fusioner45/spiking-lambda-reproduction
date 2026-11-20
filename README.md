@@ -165,7 +165,10 @@ weakenings.
 All 19 validation banks pass. Known limits, documented in the note:
 the balance counter drifts on subterms longer than ~30 tokens (a
 tau_m >= 1000 ms fix is included), and the binding circuit has a
-measured sensitivity to one-bit phase noise (see the noise study).
+measured sensitivity to one-bit phase noise: a majority vote over
+repeated multi-bit presentations eliminates the false bindings at
+5 % noise (k=7 -> 0/40) and halves them at 10 % (residual open;
+see the noise study).
 
 Related paper: arXiv:2611.23182v1. This repository is an independent
 reimplementation for review purposes; it is not the authors' code.
