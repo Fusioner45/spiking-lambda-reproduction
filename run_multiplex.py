@@ -66,6 +66,7 @@ import bind_gamma
 import cube_write as cw
 import cube_state as cs
 import cube_multiplex as cm
+import gated_chain as gc
 import orchestrate as orc
 
 ENGINE = "c"                    # les DEUX modes sur le même moteur ;
@@ -284,6 +285,63 @@ def main():
     print()
     print("M4 VALIDE : egalite de sortie et de poids verifiee avant chaque")
     print("mesure, determinisme asserte, formules de comptage assertees.")
+
+    # m5 : GATING NEURAL (GATE_BOUND, sessions C-D) — la chaine gatee :
+    # UNE emission brute, projections ROUTEES reelles (cablage pose a la
+    # creation depuis le ring) vers TOUS les taps, et une GATE LIF par
+    # tap (§2.9 : courant d'armement pendant SA fenetre) qui selectionne
+    # l'apprentissage. Les evenements SRC tombent au minimum theorique
+    # (l'emission brute seulement) : les relais de routage du m4
+    # deviennent du cablage. Differentiel : poids bit-exacts vs v1 +
+    # lecture fidele, apres avoir traverse TOUTES les fenetres.
+    import gated_chain as _gc
+    for term_mx in ("(\\x. x x) (\\f. \\x. f (f x))",
+                    "(\\x. x (x (x y))) (\\f. \\x. f x)"):
+        cur = lb.parse(term_mx)
+        db = bd.to_debruijn(cur)
+        toks = bd.to_tokens(db)
+        rows = fv.rows_fix(db)
+        K = bd.find_redex(cur)
+        l_body = intg_body.IntgCircuit(toks, K).run()["pos"] + 1
+        l_arg = intg_body.IntgCircuit(toks, K + l_body).run()["pos"] + 1
+        body_end = K + 2 + l_body
+        bound_abs = bind_gamma.truth_bound_indices(rows, K, body_end)
+        bound_sh = {j: toks[j][1] - 1 - toks[K][1] for j in bound_abs}
+        ring_mx = orc.ring_phase.PhaseRing()
+        pats = cw.compose_cube(toks, rows, K, l_body, l_arg, bound_sh,
+                               ring_mx)
+        raw, groups = cm.arg_chain_plan(rows, K, l_body, l_arg, bound_sh)
+        chain_g = _gc.GatedChain(raw, groups, pats)
+        chain_g.run()
+        arg_slots = sorted(s for start, _sh in groups
+                           for s in range(start, start + len(raw)))
+        for s in arg_slots:
+            direct = cm._new_bank("py", s)
+            cm.learn_direct(direct, pats[s])
+            assert cm.bank_weights(chain_g.taps[s]) == \
+                cm.bank_weights(direct), \
+                ("m5 : poids slot %d differents du v1" % s)
+        read = []
+        for s in range(len(pats)):
+            if s in arg_slots:
+                ph = chain_g.recall(s, pats[s])
+            else:
+                direct = cm._new_bank("py", s)
+                cm.learn_direct(direct, pats[s])
+                ph = direct.recall(cs.pattern_bits(pats[s]))
+            act = sorted(k for k in range(56) if ph[k])
+            chs = [None] * 7
+            for k in act:
+                g, v = divmod(k, 8)
+                assert chs[g] is None, (s, "deux phases au canal")
+                chs[g] = v
+            read.append(cs.decode_pattern(tuple(chs)))
+        assert read == orc.rewrite(toks, rows, K, l_body, l_arg,
+                                   bound_sh), \
+            ("m5 : lecture infidele", term_mx)
+        print("  m5 gate neurale %-28s : %d taps traversent toutes les"
+              " fenetres, poids + rappel EXACTS (GATE_BOUND)"
+              % (term_mx, len(arg_slots)))
 
 
 if __name__ == "__main__":
