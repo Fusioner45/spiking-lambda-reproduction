@@ -105,8 +105,24 @@ def run_battery(gating):
                     elif b_src > d_lam:
                         # binder interne : le (n+1)-ieme LAM actif, a sa
                         # profondeur d'ancrage (= b_src - 1)
-                        assert b_circuit == b_src - 1, \
-                            (term, binder_n, b_circuit, b_src)
+                        if b_circuit != b_src - 1:
+                            # anti-boucle : UN diagnostic, arret propre
+                            print("ECHEC lecture binder :")
+                            print("  terme=%s slot=%d binder_n=%d "
+                                  "-> b=%s (attendu %d)"
+                                  % (term, pos, binder_n, b_circuit,
+                                     b_src - 1))
+                            print("  reponses (t, depth) : %s"
+                                  % (stack.last_responses,))
+                            print("  sondes GATE (id, depth, actif, "
+                                  "V_avant_onde, V_pic, spiked) :")
+                            for rec in stack.last_gate_vs:
+                                print("    %s" % (rec,))
+                            print("  spikes du slot (t, label), "
+                                  "POS inclus — deja collectes :")
+                            for t_s, label in stack.last_slot_spikes:
+                                print("    %.1f %s" % (t_s, label))
+                            raise SystemExit(1)
                         assert spec[gi][2] + 8 * spec[gi][3] == b_src - 1
                         b_stats["interne"] += 1
                     else:
@@ -131,6 +147,45 @@ def main():
     print("=" * 64)
     print("PILE D'INTG DU RE-SCAN (v3a + v3b-1) - circuit LIF vs spec")
     print("=" * 64)
+
+    # 0. test unitaire du AND asymptotique (fix session 21) : un GATE
+    #    arme 500 ms SANS onde reste muet (l'asymptote du train PERSIST
+    #    ne franchit pas le seuil), puis l'onde a t~500 ms fait fire
+    #    EXACTEMENT une fois
+    stack = rc.RescanStack(0.0, gating="global", max_tokens=4)
+    stack.feed("LAM")                      # un lieur arme
+    lam = [lv for lv in stack.all if lv["kind"] == "LAM"][0]
+    g_idx = lam["gate"]
+    steps = int(round(stack.slot_ms / stack.dt))
+    n_before = 0
+    for _ in range(int(round(500.0 / stack.slot_ms))):  # ~500 ms sans onde
+        for _t, idx in stack.net.bulk_run(steps):
+            if idx == g_idx:
+                n_before += 1
+    assert n_before == 0, \
+        "le GATE arme 500 ms doit rester muet (calibrage asymptotique)"
+    # ondes aux horloges REELLES du reseau (independantes de SLOT_MS) :
+    # onde 1 = 1 slot + 0.6 apres l'armement (meme offset que t_query) ;
+    # onde 2 = 1 slot apres l'onde 1 — le reset post-spike a vide le
+    # GATE ; le tonique ne recharge qu'a ~0.40 : le saut d'onde 0.78
+    # doit faire fire quand meme (le cas des 2 VAR consecutifs)
+    t_arm = stack.net.k_step * stack.dt
+    t_w1 = t_arm + stack.slot_ms + 0.6
+    t_w2 = t_w1 + stack.slot_ms
+    stack.net.inject_spike(lam["pq"], t_w1)
+    stack.net.inject_spike(lam["pq"], t_w2)
+    fires = []
+    for _ in range(4):
+        for _t, idx in stack.net.bulk_run(steps):
+            if idx == g_idx:
+                fires.append(_t)
+    assert len(fires) == 2, \
+        "2 ondes = 2 fires exactement (recus : %s)" % (fires,)
+    assert t_w1 <= fires[0] < t_w2 and fires[1] >= t_w2, \
+        "un fire par onde, dans l'ordre (recus : %s)" % (fires,)
+    print("  AND asymptotique : 0 spike sur 500 ms arme ; 2 ondes "
+          "separees de 1 slot = 2 fires (t=%.1f, t=%.1f) — OK"
+          % (fires[0], fires[1]))
 
     # 1. v3a : injection selective par niveau
     st, tk, simul, _c, bs = run_battery("selective")
