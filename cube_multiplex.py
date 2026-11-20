@@ -78,66 +78,129 @@ def learn_direct(bank, pattern):
     bank.learn(cs.pattern_bits(pattern))
 
 
-def run_chain(raw, taps, engine="py", bank_hook=None):
+def learn_counted(bank, pattern, ctr, engine):
+    """Ecriture directe v1 AVEC comptage m4 — MEMES mecaniques que
+    learn (meme schedule, meme pas, meme tonique), le comptage se fait
+    au harnais : cycles executes, evenements SRC programmes, spikes DST
+    decales (definitions et fenetres : run_multiplex.py)."""
+    bits = cs.pattern_bits(pattern)
+    steps_per_cycle = int(round(copy_stdp.CYCLE_MS / copy_stdp.DT))
+    if engine == "c":
+        n0 = snn_core._LIB.cp_n_spikes(bank.h)
+        bank.learn(bits)                    # mecanique v1 inchangee
+        ctr["cycles"] += copy_stdp.N_CYCLES
+        ctr["src"] += copy_stdp.N_CYCLES * len(bits)
+        ctr["dst"] += snn_core._LIB.cp_n_spikes(bank.h) - n0
+    else:
+        for _c in range(copy_stdp.N_CYCLES):
+            for k in bits:
+                bank.schedule_src(k, copy_stdp.SRC_OFFSET_MS)
+                ctr["src"] += 1
+            for _ in range(steps_per_cycle):
+                ctr["dst"] += len(bank.step(True))
+            ctr["cycles"] += 1
+
+
+def run_chain(raw, taps, engine="py", bank_hook=None, ctr=None):
     """LA chaine : l_arg fenetres de 6 cycles ; l'emetteur brut tire les
     evenements du token i dans la fenetre i (UNE emission par token, a
     CHAQUE cycle comme le learn v1), et chaque tap apprend son pattern
     route pendant LES MEMES cycles (tous les bancs avancent en pas de
-    temps partages — les traces/wights sont par banc, l'entrelacement
+    temps partages — les traces/weights sont par banc, l'entrelacement
     n'a donc aucun effet : c'est l'invariance m2, verifiee par banc).
 
-    taps : liste (slot, pattern_route) — l'ordre des taps est libre
-    (m2 : l'invariance est verifiee par permutation dans run_cube.py).
-    bank_hook(bank, slot, pattern) : appele UNE fois par banc apres la
-    fin de la chaine (le sabotage in-loop de run_cube passe par la).
+    LE GATING (m4) : taps = liste (slot, pattern_route, fenetre) — le
+    tap n'est programme que pendant SA fenetre (celle du token qu'il
+    destine ; c'est le role de GATE_BOUND §4.5, porte ici par la donnee
+    de fenetre, statut meta-controleur). Avant le m4, le tap re-recevait
+    son pattern a CHAQUE fenetre : poids finaux inchanges (clamp W=8)
+    mais flux SRC gonfle x l_arg et adressage temporel viole — detecte
+    par les assertions de formules du banc m4.
 
-    Renvoie {slot: bank}."""
+    L'EMETTEUR est une source d'emission pure : ses DST sont maintenus
+    sans tonique (silencieuses, aucun apprentissage parasite) — seul le
+    flux SRC de la chaine compte.
+
+    L'ordre de creation des taps est libre (m2). bank_hook(bank, slot,
+    pattern) : appele UNE fois par banc apres la fin de la chaine (le
+    sabotage in-loop de run_cube passe par la). ctr : dict optionnel
+    {"cycles", "src", "dst"} — comptage m4 (definitions :
+    run_multiplex.py). Renvoie {slot: bank}."""
     steps_per_cycle = int(round(copy_stdp.CYCLE_MS / copy_stdp.DT))
     offset_steps = int(round(copy_stdp.SRC_OFFSET_MS / copy_stdp.DT))
     n_cycles = copy_stdp.N_CYCLES
+    by_window = {}
+    for s, pat, w in taps:
+        assert 0 <= w < len(raw), ("fenetre hors chaine", s, w)
+        by_window.setdefault(w, []).append((s, pat))
     # capacite etendue pour la chaine : l_arg fenetres de 6 cycles +
     # un rappel + marge (les evenements sont indexes en pas ABSOLUS)
     alloc = len(raw) * n_cycles * steps_per_cycle \
         + int(round(copy_stdp.CYCLE_MS * 3 / copy_stdp.DT)) + 128
     banks = {}
-    for s, _pat in taps:                    # l'ordre des taps est libre
+    for s, _pat, _w in taps:                # l'ordre de creation est libre
         banks[s] = _new_bank(engine, s, n_steps_alloc=alloc)
     chain = _new_bank(engine, -1, n_steps_alloc=alloc)  # emetteur brut
     if engine == "c":
         t0 = 0                              # horloge globale (pas absolus)
         for i, raw_pat in enumerate(raw):
             raw_bits = cs.pattern_bits(raw_pat)
+            taps_i = by_window.get(i, [])
             for c in range(n_cycles):       # SRC a CHAQUE cycle (v1)
                 for k in raw_bits:          # l'emission brute, UNE fois
                     snn_core._LIB.cp_schedule_src(
                         chain.h, k, t0 + c * steps_per_cycle + offset_steps)
-                for s, pat in taps:         # les taps, MEME fenetre
+                    if ctr is not None:
+                        ctr["src"] += 1
+                for s, pat in taps_i:       # les taps de CETTE fenetre
                     for k in cs.pattern_bits(pat):
                         snn_core._LIB.cp_schedule_src(
                             banks[s].h, k,
                             t0 + c * steps_per_cycle + offset_steps)
-            snn_core._LIB.cp_run(chain.h, n_cycles * steps_per_cycle, 1)
+                        if ctr is not None:
+                            ctr["src"] += 1
+            n0_chain = snn_core._LIB.cp_n_spikes(chain.h)
+            snn_core._LIB.cp_run(chain.h, n_cycles * steps_per_cycle, 0)
+            if ctr is not None:
+                ctr["dst"] += snn_core._LIB.cp_n_spikes(chain.h) - n0_chain
             chain._k += n_cycles * steps_per_cycle
-            for s, _pat in taps:
+            for s, _pat, _w in taps:
+                n0 = snn_core._LIB.cp_n_spikes(banks[s].h)
                 snn_core._LIB.cp_run(banks[s].h,
                                      n_cycles * steps_per_cycle, 1)
+                if ctr is not None:
+                    ctr["dst"] += snn_core._LIB.cp_n_spikes(banks[s].h) - n0
                 banks[s]._k += n_cycles * steps_per_cycle
+            if ctr is not None:
+                ctr["cycles"] += n_cycles
             t0 += n_cycles * steps_per_cycle
     else:
-        for raw_pat in raw:                 # fenetres successives
+        for i, raw_pat in enumerate(raw):   # fenetres successives
             raw_bits = cs.pattern_bits(raw_pat)
+            taps_i = by_window.get(i, [])
             for _c in range(n_cycles):      # SRC a CHAQUE cycle (v1)
                 for k in raw_bits:          # l'emission brute, UNE fois
                     chain.schedule_src(k, copy_stdp.SRC_OFFSET_MS)
-                for s, pat in taps:         # les taps, MEME fenetre
+                    if ctr is not None:
+                        ctr["src"] += 1
+                for s, pat in taps_i:       # les taps de CETTE fenetre
                     for k in cs.pattern_bits(pat):
                         banks[s].schedule_src(k, copy_stdp.SRC_OFFSET_MS)
+                        if ctr is not None:
+                            ctr["src"] += 1
                 for _ in range(steps_per_cycle):   # pas de temps PARTAGES
-                    chain.step(True)
-                    for s, _pat in taps:
-                        banks[s].step(True)
+                    if ctr is not None:
+                        ctr["dst"] += len(chain.step(False))
+                        for s, _pat, _w in taps:
+                            ctr["dst"] += len(banks[s].step(True))
+                    else:
+                        chain.step(False)
+                        for s, _pat, _w in taps:
+                            banks[s].step(True)
+                if ctr is not None:
+                    ctr["cycles"] += 1
     if bank_hook is not None:
-        for s, pat in taps:                 # UNE fois par banc, apres la
+        for s, pat, _w in taps:             # UNE fois par banc, apres la
             bank_hook(banks[s], s, pat)     # chaine (sabotage in-loop)
     return banks
 
@@ -160,7 +223,8 @@ def build_cube(slot_pats, raw, groups, engine="py", bank_hook=None):
             learn_direct(banks[s], slot_pats[s])
             if bank_hook is not None:
                 bank_hook(banks[s], s, slot_pats[s])
-    taps = [(s, slot_pats[s]) for s in sorted(arg_slots)]
+    taps = [(start + i, slot_pats[start + i], i)
+            for start, _sh in groups for i in range(len(raw))]
     chain_banks = run_chain(raw, taps, engine=engine, bank_hook=bank_hook)
     for s, b in chain_banks.items():
         banks[s] = b

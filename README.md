@@ -142,10 +142,18 @@ addresses). The per-tap routing stays on the real phase ring, the tap
 gating remains meta-controller (the Section 2.11 boundary), and the
 differential benches prove the tapped weights are bit-exact against
 direct writes and invariant under tap interleaving, on both engines.
+The formal cost comparison (m4, `run_multiplex.py`) measures simulated
+theta cycles, SRC events, DST spikes, allocated resources and engine
+wall-clock for both modes on the (n_bound, l_arg) family at bit-exact
+output equality: the simulated copy time drops by the predicted factor
+(up to 6.1x at n_bound=8) while the per-slot memory is unchanged; the
+literal SRC-event count includes the routing relays (the same spikes
+arriving through gates in a physical realization -- the neural
+GATE_BOUND milestone would remove that term).
 
 ## Status and limits
 
-All 17 validation banks pass. Known limits, documented in the note:
+All 18 validation banks pass. Known limits, documented in the note:
 the balance counter drifts on subterms longer than ~30 tokens (a
 tau_m >= 1000 ms fix is included), and the binding circuit has a
 measured sensitivity to one-bit phase noise (see the noise study).

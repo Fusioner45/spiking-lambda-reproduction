@@ -153,7 +153,11 @@ def main():
                            for s in range(start, start + len(raw)))
         base_w, base_f = {}, {}
         for perm_i in range(4):
-            taps = list(zip(arg_slots, [pats[s] for s in arg_slots]))
+            # taps = triples (slot, pattern, fenetre) : le gating est
+            # porte par la donnee — la permutation shuffle l'ORDRE DE
+            # CREATION, pas l'affectation aux fenetres (m2 : invariance)
+            taps = [(start + i, pats[start + i], i)
+                    for start, _sh in groups for i in range(len(raw))]
             if perm_i:
                 rnd = random.Random(perm_i)
                 rnd.shuffle(taps)

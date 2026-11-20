@@ -194,12 +194,36 @@ end-to-end with the per-step filet assert.
 
 Latent bug found and fixed on the way (probe, not review): CopyC
 (snn_core.py) scheduled learn/recall events at ABSOLUTE steps from
-zero and its recall read the WHOLE spike log since creation — the
+zero and its recall read the WHOLE spike log since creation -- the
 "C recall" was actually reading the learn-phase spikes, which only
 worked because the content coincides. `CopyC` now tracks its own
 clock (_k), schedules relative to it, and reads only the recall
 window's spikes; a n_steps_alloc parameter was added (the chain needs
 l_arg x 720 steps of event capacity).
+
+m4 DONE (same session, formal cost comparison requested by the user):
+`run_multiplex.py` measures both modes on the (n_bound, l_arg) family
+at bit-exact output/weight equality: simulated theta cycles (the
+headline: 1.0x at n_bound=1, up to 6.1x at n_bound=8), literal SRC
+events (mux = sequential + the chain's raw emission; the routing
+relays are counted literally and decomposed -- in a physical
+realization they are the same spikes arriving through gates, so the
+neural GATE_BOUND milestone would remove that term), DST spikes
+(measured, not forced: the taps run warm through the chain while the
+direct banks start fresh; final weights identical), resources
+(banks/memory unchanged by construction), and engine wall-clock
+reported SEPARATELY as overhead (the harness serializes the
+biologically-parallel banks, so mux wall-clock is higher in our sim
+-- never mixed with simulated time). Gating/composition are shared
+preconditions excluded from the copy delta (object identity
+asserted); the fixed prep cost of the multiplexing is measured
+separately (microseconds). Metric definitions and counting windows
+are documented in the module docstring. The m4 protocol itself caught
+a real semantics gap: the taps originally received their pattern in
+EVERY window (weights unchanged by clamping, but the SRC flow was
+inflated and the time-addressing violated) -- the per-window gating
+is now explicit (each tap carries its window), matching the
+GATE_BOUND role.
 
 ## 5. Honest boundaries throughout
 
