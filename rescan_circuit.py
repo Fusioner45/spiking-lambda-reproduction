@@ -80,7 +80,13 @@ import snn_engine as se
 SLOT_MS = 12.0
 DT = 0.1
 
-PV_GLOBAL, PA_GLOBAL = 100, 101            # ports VAR/APP globaux (v3b-1)
+# ports VAR/APP globaux (v3b-1) — indices 1000+ : les indices 100/101
+# COLLISAIENT avec les neurones des niveaux a partir de la profondeur
+# 25 (le 25e LAM alloue intg=4k+1, pos=4k+2, persist=4k+3, gate=4k+4 :
+# la gate du 25e LAM = index 100 = PV_GLOBAL, l'INTG du 26e = 101 =
+# PA_GLOBAL — chaque pulse VAR/APP frappait directement les niveaux
+# profonds : revue externe session 32, le banc de stress l'a trouve)
+PV_GLOBAL, PA_GLOBAL = 1000, 1001
 
 _W_PG_CACHE = None                         # calibrage global du tonique
 

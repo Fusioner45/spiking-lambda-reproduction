@@ -172,7 +172,7 @@ weakenings.
 
 ## Status and limits
 
-All 19 validation banks pass. Known limits, documented in the note:
+All 20 validation banks pass. Known limits, documented in the note:
 the balance counter drifts on subterms longer than ~30 tokens (a
 tau_m >= 1000 ms fix is included), and the binding circuit has a
 measured sensitivity to one-bit phase noise: a majority vote over
