@@ -35,11 +35,14 @@ PERSIST/GATE/SCAN orchestration.
   circuits (one copy channel per slot, 7 phase channels per token) and
   read back through recall dynamics. Corrupting one learned weight
   stops the reduction, which shows the state really flows through the
-  memories. An interruption test rebuilds the cube from the captured
-  STDP weights alone after 2 reduction steps (no symbolic state): the
+  memories. An interruption matrix rebuilds the cube from the captured
+  STDP weights alone (no symbolic state) at several interruption points
+  (k in {1, 2, 3} on 2 I, k in {2, 4} on PLUS 2 3) on both engines: the
   term is read back from the memories and the reduction continues to
-  the same final form, with the dynamical state (potentials, traces,
-  refractories) re-initialized, not restored (`run_cube.py`).
+  the same trace and final form, with the dynamical state (potentials,
+  traces, refractories) re-initialized, not restored (`run_cube.py`;
+  an open-term variant is kept as a documented strict expected failure,
+  see the note).
 
 See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and

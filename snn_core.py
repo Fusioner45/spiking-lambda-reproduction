@@ -51,6 +51,8 @@ _LIB.cp_run.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
 _LIB.cp_reset.argtypes = [ctypes.c_void_p]
 _LIB.cp_weight.restype = ctypes.c_double
 _LIB.cp_weight.argtypes = [ctypes.c_void_p, ctypes.c_int]
+_LIB.cp_set_weight.argtypes = [ctypes.c_void_p, ctypes.c_int,
+                               ctypes.c_double]
 _LIB.cp_n_spikes.restype = ctypes.c_int
 _LIB.cp_n_spikes.argtypes = [ctypes.c_void_p]
 _LIB.cp_spike.argtypes = [ctypes.c_void_p, ctypes.c_int,
@@ -190,6 +192,12 @@ class CopyC:
 
     def weights(self):
         return [_LIB.cp_weight(self.h, k) for k in range(self.n)]
+
+    def set_weights(self, ws):
+        """Recharge des poids captures (reprise interruption/reprise :
+        les poids seuls, sans aucun etat symbolique)."""
+        for k, w in enumerate(ws):
+            _LIB.cp_set_weight(self.h, k, w)
 
     def reset(self):
         _LIB.cp_reset(self.h)

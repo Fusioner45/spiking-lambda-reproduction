@@ -328,6 +328,7 @@ EXPORT void cp_reset(Copy *c) {
 }
 
 EXPORT double cp_weight(Copy *c, int k) { return c->w[k]; }
+EXPORT void cp_set_weight(Copy *c, int k, double w) { c->w[k] = w; }
 EXPORT int cp_n_spikes(Copy *c) { return c->n_sp; }
 EXPORT void cp_spike(Copy *c, int i, int *step, int *k) {
     *step = c->sp_step[i]; *k = c->sp_k[i];

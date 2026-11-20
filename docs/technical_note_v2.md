@@ -90,13 +90,25 @@ banks alone; no symbolic state of the term is kept. Rebuilt at resume:
 the cube network is re-created fresh (membrane potentials, synaptic
 traces and refractory timers are re-initialized, not restored), the
 weights are reloaded, and the term is read back from the memories by
-recall; the reduction then continues. Tested scope: one interruption
-point (k=2), one term (2 I, Church 2 applied to the identity), one
-engine (Python); the scope is small and
-stated. The resumed trace and the final normal form are identical to the
-uninterrupted reference. This demonstrates a rebuild-from-weights
-protocol: the weights alone carry everything required to reconstruct the
-term and continue. It does not demonstrate restoring the complete
+recall; the reduction then continues. Tested scope: a matrix of
+interruption points, terms and engines: k in {1, 2, 3} on 2 I
+(Church 2 applied to the identity) and k in {2, 4} on PLUS 2 3, each
+rebuilt from the weights alone on the Python and the C engine (nine
+closed-term cases; k = 3 resumes at the last step, where the read-back
+term is already the normal form). On every case the read-back term
+equals the symbolic term, and the resumed trace and final normal form
+equal the uninterrupted reference. An open-term variant exposed a
+pre-existing convention defect: to_debruijn assigns free-variable
+indices by appearance order and ignores the stable level suffixes that
+from_debruijn writes, so free-variable identity is not stable across a
+reduction that reorders them; the production differential cannot see
+it (the assembly is compared to itself), and the open-term cases stay
+in the bank as strict expected failures until the convention is fixed.
+The rebuild-from-weights conclusion holds for closed terms, which is
+exactly the closed-complete scope stated above. This demonstrates a
+rebuild-from-weights protocol: the weights alone carry everything
+required to reconstruct the term and continue. It does not demonstrate
+restoring the complete
 dynamical state (potentials, traces, refractories), which is a distinct
 and stronger claim we do not make.
 
