@@ -145,19 +145,29 @@ class GatedChain:
                 self.taps[slot] = GatedTap(slot, routed, i,
                                            i_on=i_on, thr=thr)
 
-    def run(self):
+    def run(self, ctr=None):
         """Deroule la chaine : l_arg fenetres de 6 cycles ; a l'offset
         de chaque cycle, les canaux du token courant tirent (l'UNIQUE
-        emission) et les projections routent vers tous les taps."""
+        emission) et les projections routent vers tous les taps.
+        ctr (m4) : {"cycles", "src", "dst"} — les evenements SRC sont
+        l'emission brute SEULE (les livraisons sont du cablage) ; les
+        spikes DST comptent les tires de tous les taps (fenetre propre
+        + re-tirs clampes hors fenetre)."""
         offset = int(round(copy_stdp.SRC_OFFSET_MS / DT))
         raw_bits = [cs.pattern_bits(p) for p in self.raw]
         for i in range(len(self.raw)):
             canals = [k // 8 for k in raw_bits[i]]
+            if ctr is not None:
+                ctr["cycles"] += copy_stdp.N_CYCLES
             for _c in range(copy_stdp.N_CYCLES):
                 for _s in range(CYCLE_STEPS):
                     pre = canals if _s == offset else []
+                    if ctr is not None and pre:
+                        ctr["src"] += len(pre)
                     for tap in self.taps.values():
-                        tap.step(pre, i)
+                        spiked = tap.step(pre, i)
+                        if ctr is not None:
+                            ctr["dst"] += len(spiked)
 
     def weights(self, slot):
         return list(self.taps[slot].w)

@@ -286,6 +286,77 @@ def main():
     print("M4 VALIDE : egalite de sortie et de poids verifiee avant chaque")
     print("mesure, determinisme asserte, formules de comptage assertees.")
 
+    # m5 : la mesure du GATE_BOUND neural (gated_chain.py, moteur py) —
+    # les evenements SRC au MINIMUM theorique (l'emission brute de la
+    # chaine seulement : les relais de routage du m4 deviennent du
+    # cablage — compte ici comme ressource, pas comme emissions)
+    print()
+    print("M5 - GATE_BOUND neural (gated_chain, moteur py) :")
+    print("  %-18s %7s %8s %8s %10s %8s" %
+          ("famille", "cycles", "SRC", "DST", "cablage", "wall ms"))
+    for n_occ, k_num in [(2, 2), (4, 4)]:   # le harnais py impose des
+        # familles modestes (le m5 demontre le minimum, pas la montee)
+        numeral = "(\\f. \\x. " + "f (" * k_num + "x" + ")" * k_num + ")"
+        term = "(\\x. " + " ".join(["x"] * n_occ) + ") " + numeral
+        cur = lb.parse(term)
+        db = bd.to_debruijn(cur)
+        toks = bd.to_tokens(db)
+        rows = fv.rows_fix(db)
+        K = bd.find_redex(cur)
+        l_body = intg_body.IntgCircuit(toks, K,
+                                       tau_m=1000.0).run()["pos"] + 1
+        l_arg = intg_body.IntgCircuit(toks, K + l_body,
+                                      tau_m=1000.0).run()["pos"] + 1
+        body_end = K + 2 + l_body
+        bound_abs = bind_gamma.truth_bound_indices(rows, K, body_end)
+        bound_sh = {j: toks[j][1] - 1 - toks[K][1] for j in bound_abs}
+        ring_mx = orc.ring_phase.PhaseRing()
+        pats = cw.compose_cube(toks, rows, K, l_body, l_arg, bound_sh,
+                               ring_mx)
+        raw, groups = cm.arg_chain_plan(rows, K, l_body, l_arg, bound_sh)
+        n_arg = len(raw) * len(groups)
+        ctr_g = {"cycles": 0, "src": 0, "dst": 0}
+        chain_g = gc.GatedChain(raw, groups, pats)
+        t0 = time.perf_counter()
+        chain_g.run(ctr=ctr_g)
+        wall_g = (time.perf_counter() - t0) * 1000.0
+        wiring = n_arg * len(raw) * 7          # tables de routage (56/canal)
+        # acceptance : poids bit-exacts vs directs (py) + lecture fidele
+        arg_slots = sorted(s for start, _sh in groups
+                           for s in range(start, start + len(raw)))
+        new_toks = orc.rewrite(toks, rows, K, l_body, l_arg, bound_sh)
+        for s in arg_slots:
+            direct = cm._new_bank("py", s)
+            cm.learn_direct(direct, pats[s])
+            assert cm.bank_weights(chain_g.taps[s]) == \
+                cm.bank_weights(direct), \
+                ("m5 : poids slot %d differents du v1" % s)
+        read = []
+        for s in range(len(pats)):
+            if s in arg_slots:
+                ph = chain_g.recall(s, pats[s])
+            else:
+                direct = cm._new_bank("py", s)
+                cm.learn_direct(direct, pats[s])
+                ph = direct.recall(cs.pattern_bits(pats[s]))
+            act = sorted(k for k in range(56) if ph[k])
+            chs = [None] * 7
+            for k in act:
+                g, v = divmod(k, 8)
+                chs[g] = v
+            read.append(cs.decode_pattern(tuple(chs)))
+        assert read == new_toks, ("m5 : lecture infidele", term)
+        # le minimum theorique : SRC = l'emission brute de la chaine
+        assert ctr_g["src"] == len(raw) * 6 * 7, \
+            (ctr_g, "SRC au-dessus du minimum")
+        assert ctr_g["cycles"] == len(raw) * 6, ctr_g
+        print("  (n=%d, k=%d) l_arg=%-3d  %7d %8d %8d %10d %8.1f"
+              % (n_occ, k_num, l_arg, ctr_g["cycles"], ctr_g["src"],
+                 ctr_g["dst"], wiring, wall_g))
+    print("  (le cablage = les tables de routage n_arg x l_arg x 7 ;")
+    print("  c'est la ressource que le mode evenements du m4 payait en")
+    print("  emissions — le GATE_BOUND la transforme en cablage.)")
+
     # m5 : GATING NEURAL (GATE_BOUND, sessions C-D) — la chaine gatee :
     # UNE emission brute, projections ROUTEES reelles (cablage pose a la
     # creation depuis le ring) vers TOUS les taps, et une GATE LIF par
