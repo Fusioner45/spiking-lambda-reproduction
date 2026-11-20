@@ -124,11 +124,37 @@ a differential bench: the composed cube (v2) must remain exactly equal.
     the enclosing LAM). Design difficulty documented: when the top is
     cut, a serial inhibition chain stops propagating (two emitters on
     the bus) -- parallel inhibition or a tokenized read sequence is
-    needed. The free-index port (emitting n-1 on channels 5-6) and the
-    compose_cube integration behind a flag ride with it.
-* v3c (1 session): remove `body_slot`'s channel-level KEEP rule from
-  the meta-controller; the decrement is now fully neural. The boundary
-  note moves to "output ordering only" (the paper's own boundary).
+    needed.
+  * v3b-3 DONE: the bus was implemented as the ORDINAL WAVE readout
+    (the alternative route, avoiding the two-emitter problem
+    entirely): each LAM level carries a PERSIST (Section 2.9 bistable,
+    armed at push), a GATE-read and a pos on a LAM-to-LAM wave chain
+    that descends the stack from the top regardless of state (closed
+    levels relay the wave but do not answer). A read injects a wave at
+    the top; active GATEs answer once, closed ones stay mute, and the
+    (n+1)-th answer in ordinal order is the binder. Calibrated
+    asymptotically (tonic measured over 500 ms, wave jump +0.78,
+    GATE tau_m=30). Two root causes fixed on the way (session 24):
+    the deepest gate of a 4-LAM chain answers at ~t0+8.8 ms, past an
+    8 ms slot (SLOT_MS 8 -> 12), and closed gates accumulated the
+    wave's query pulses (+0.78 per VAR slot; a one-shot close HALT
+    only protected the first wave) -- fixed by re-pinning the gate
+    HALT at every wave. Remaining meta-controlled rule: the free-index
+    port (emitting n-1 on channels 5-6) is future work.
+* v3c DONE (1 session): `compose_cube` drives the real RescanStack
+  over the kept body tokens behind the `neural` flag (production
+  default via `orchestrate.neural_keep=True`): self comes from the
+  anchored counter (the anchor IS the KEEP decrement -- no -1 rule
+  applied anywhere) and bind from the ordinal BIND bus. The
+  channel-level KEEP rules (body_slot) remain only as the symbolic
+  reference of the differential, like the re-encoding. EXCEPTION kept
+  honest: the free-index -1 stays in the meta-controller (free
+  indices count lambdas above the body, invisible to the scan -- the
+  same status as the authors' Section 2.11); the neural free port is
+  the next milestone. Differential v2: the neural composition matches
+  the re-encoding canal by canal on the trap cases, and the closed
+  loop (living_cube) composes through the neural path with the
+  per-step filet assert.
 
 ## 4. From v3 to Item 3 (multiplexing)
 

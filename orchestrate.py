@@ -111,7 +111,7 @@ class ClosedLoop:
 
     def __init__(self, verify_copy=True, verbose=True, net_factory=None,
                  copy_engine="py", production=False, intg_tau_m=300.0,
-                 living_cube=False):
+                 living_cube=False, neural_keep=True):
         self.verify_copy = verify_copy
         self.verbose = verbose
         self.net_factory = net_factory
@@ -121,6 +121,13 @@ class ClosedLoop:
         # les memoires au lieu du re-encodage symbolique (chantier
         # revue ChatGPT, cf. cube_state.py)
         self.living_cube = living_cube
+        # v3c : les self/bind du corps garde sortent du RE-SCAN NEURAL
+        # (rescan_circuit.RescanStack — compteur ancre + bus BIND
+        # ordinal) : les regles KEEP canal-level (§2.10.3) ne sont plus
+        # appliquees par le meta-controleur (neural_keep=False remet la
+        # voie symbolique, reference du differentiel). Seule exception :
+        # l'indice -1 des VAR libres, cf. cube_write.py.
+        self.neural_keep = neural_keep
         self.intg_tau_m = intg_tau_m
         # mode production : sans comparaison oracle a chaque etape (la
         # correction du rewrite est deja etablie par la batterie ; ici on
@@ -219,13 +226,16 @@ class ClosedLoop:
         #    passe par les memoires, pas par le symbole (un canal muet
         #    ou corrompu casse l'assertion : le cube est porteur)
         if self.living_cube:
-            # v2 : les patterns des slots sont COMPOSES depuis les
+            # v2+v3c : les patterns des slots sont COMPOSES depuis les
             # emissions du terme courant (copies des sources + shifts
-            # REELS du ring) et les regles KEEP canal-level du §2.10.3
-            # (cube_write.compose_cube) — aucun re-encodage du nouveau
-            # terme dans l'ecriture
+            # REELS du ring) et le corps garde est RE-SCANNE par le
+            # circuit reel (compteur ancre + bus BIND ordinal,
+            # neural_keep) — les regles KEEP canal-level ne servent
+            # plus qu'a la reference du differentiel ; aucun
+            # re-encodage du nouveau terme dans l'ecriture
             slot_pats = cube_write.compose_cube(
-                toks, rows, K, l_body, l_arg, bound_sh, self.ring)
+                toks, rows, K, l_body, l_arg, bound_sh, self.ring,
+                neural=self.neural_keep)
             if not self.production:
                 # differentiel : la composition reproduit exactement
                 # l'encodage du terme assemble (filet, mode verifie)

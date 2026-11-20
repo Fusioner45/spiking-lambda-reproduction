@@ -97,7 +97,19 @@ def main():
         keep = [cw.body_slot(r, d_lam)
                 for j, r in enumerate(rows[K + 2:body_end]) if j not in skip]
         assert spec == keep, (term, spec, keep)
-        print("  composition %-24s : %d slots + %d gardes, EXACT"
+        # v3c : la COMPOSITION NEURALE (re-scan reel derriere flag) —
+        # differentiel v2 CANAL PAR CANAL contre le re-encodage (le
+        # mememe flux de tokens que run_rescan : SKIP aux VAR lies,
+        # l'argument insere par le ring a leur place)
+        pats_n = cw.compose_cube(toks, rows, K, l_body, l_arg, bound_sh,
+                                 ring, neural=True)
+        assert len(pats_n) == len(ref), (term, len(pats_n), len(ref))
+        for s, (pn, pr) in enumerate(zip(pats_n, ref)):
+            for c, (xn, xr) in enumerate(zip(pn, pr)):
+                assert xn == xr, \
+                    (term, "slot %d canal %d" % (s, c), xn, xr)
+        print("  composition %-24s : %d slots + %d gardes, EXACT "
+              "(KEEP symbolique + re-scan NEURAL, canal par canal)"
               % (term, len(pats), len(spec)))
 
     # 3. differentiel moteur : Python == C

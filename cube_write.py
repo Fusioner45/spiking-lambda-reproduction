@@ -14,11 +14,17 @@ Provenance de chaque canal d'un slot destination :
     et la RETENUE est comptee sur les rebouclages observes de la
     sequence de feux — l'evenement neural qui porte le registre
     COARSE (grille 1000/1000 de la session 9) ;
-  - token du CORPS garde (self -1, bind -1 si son binder est sous le
-    lambda du redex, indice libre -1) : decrement canal par canal,
-    regle KEEP du §2.10.3 — LA MEME REGLE que le papier applique dans
-    son propre metagestionnaire (§2.11) ; la version 100 % neurale
-    (re-scan du corps par les SCAN imbriques) est le chantier suivant.
+  - token du CORPS garde (v3c, neural=True — le DEFAUT production) :
+    self et bind sortent du RE-SCAN NEURAL reel (rescan_circuit.
+    RescanStack, sessions 18-24) — le compteur de profondeur ANCRE a
+    d_lam produit self (l'ancrage EST le decrement KEEP : plus aucune
+    regle -1 appliquee) et l'onde ordinale du bus BIND lit le lieur ;
+    les regles KEEP canal-level §2.10.3 (neural=False) ne servent plus
+    que de REFERENCE au differentiel, comme le re-encodage. SEULE
+    EXCEPTION : l'indice -1 des VAR LIBRES reste applique par le
+    meta-controleur (l'indice libre compte les lieurs au-dessus du
+    corps, invisibles du scan) — meme statut que le §2.11 des auteurs ;
+    le port libre neural est le jalon suivant.
 
 Les DECISIONS de composition (qui est garde, qui recoit l'argument,
 quels canaux sont shifts) viennent des circuits reels : K de DET,
@@ -30,6 +36,7 @@ tri topographique chez les auteurs.
 
 import bridge_db as bd
 import cube_state as cs
+import rescan_circuit as rc
 
 LAM, APP = bd.LAM, bd.APP
 
@@ -176,12 +183,43 @@ def arg_slot(ring, row_arg, sh, d_arg_root):
     return (self2[0], self2[1], bf, bc, cs.TY_VAR, 0, 0)
 
 
-def compose_cube(toks, rows, K, l_body, l_arg, bound_sh, ring):
+def _neural_slot(row, kind, cur, b):
+    """Slot destination d'un token du CORPS garde depuis les SORTIES du
+    re-scan neural (v3c) : self = compteur ANCRE (l'ancrage est le
+    decrement KEEP — plus aucune regle -1), bind = profondeur lue par
+    l'onde ordinale du bus BIND (None : binder hors du corps, canaux
+    source inchanges ; libre : (7,7) + indice decremente — la SEULE
+    regle KEEP encore meta-controlee, cf. docstring d'en-tete)."""
+    tid, _d, _sf, _sc, bf, bc, libre = row
+    self2 = (cur % 8, (cur // 8) % 8)
+    if kind == "LAM":
+        return (self2[0], self2[1], 0, 0, cs.TY_LAM, 0, 0)
+    if kind == "APP":
+        return (self2[0], self2[1], 0, 0, cs.TY_APP, 0, 0)
+    if libre:
+        n2 = _dec(((tid - 4) % 8, ((tid - 4) // 8) % 8))
+        return (self2[0], self2[1], 7, 7, cs.TY_VAR, n2[0], n2[1])
+    if b is None:                          # binder hors du corps
+        return (self2[0], self2[1], bf, bc, cs.TY_VAR, 0, 0)
+    return (self2[0], self2[1], b % 8, (b // 8) % 8, cs.TY_VAR, 0, 0)
+
+
+def compose_cube(toks, rows, K, l_body, l_arg, bound_sh, ring,
+                 neural=False, stack_factory=None):
     """Les patterns 7 canaux des slots du prochain cube, dans l'ordre
     topographique (§2.10.3) : prefixe garde, corps (avec insertion de
     l'argument aux positions des VAR lies), suffixe garde. Aucune
     reconstruction du terme : seules les emissions du terme courant
-    (patterns sources) et le ring sont consommees."""
+    (patterns sources) et le ring sont consommees.
+
+    neural=False : le corps passe par les regles KEEP canal-level
+    (§2.10.3, body_slot) — la REFERENCE du differentiel. neural=True
+    (v3c, DEFAUT production via orchestrate) : le corps est RE-SCANNE
+    par le circuit reel (RescanStack, sessions 18-24) — les self/bind
+    des tokens gardes sortent du compteur ancre et du bus BIND, plus
+    aucune regle -1 appliquee par le meta-controleur (excepte l'indice
+    libre, cf. docstring d'en-tete). stack_factory permet d'injecter
+    une fabrique alternative (meme convention que net_factory)."""
     d_lam = toks[K + 1][1]
     d_ref = toks[K][1]
     d_arg_root = toks[K + 2 + l_body][1]
@@ -190,13 +228,39 @@ def compose_cube(toks, rows, K, l_body, l_arg, bound_sh, ring):
     slots = []
     for j in range(K):                     # prefixe : copie directe
         slots.append(cs.slot_pattern_from_row(rows[j]))
-    for j in range(K + 2, body_end):       # corps, dans l'ordre
-        if j in bound_sh:
-            sh = bound_sh[j]
-            for jj in range(body_end, body_end + l_arg):
-                slots.append(arg_slot(ring, rows[jj], sh, d_arg_root))
-        else:
-            slots.append(body_slot(rows[j], d_lam))
+    body_rows = rows[K + 2:body_end]
+    skip = {j - (K + 2) for j in bound_sh}
+    if neural:
+        # v3c : re-scan NEURAL du corps — le meme flux que le banc
+        # run_rescan (SKIP aux positions des VAR lies, l'argument
+        # insere par le ring a leur place)
+        stack = (stack_factory or rc.RescanStack)(d_lam,
+                                                  max_tokens=len(body_rows))
+        for pos, row in enumerate(body_rows):
+            tid = row[0]
+            if pos in skip:
+                stack.feed("SKIP")
+                sh = bound_sh[pos + K + 2]
+                for jj in range(body_end, body_end + l_arg):
+                    slots.append(arg_slot(ring, rows[jj], sh, d_arg_root))
+            else:
+                if tid >= 4:
+                    kind, binder_n = "VAR", tid - 4
+                elif tid == bd.LAM:
+                    kind, binder_n = "LAM", None
+                else:
+                    kind, binder_n = "APP", None
+                cur, b = stack.feed(kind, binder_n)
+                slots.append(_neural_slot(row, kind, cur, b))
+        assert stack.levels == [], "le corps doit fermer au dernier token"
+    else:
+        for pos, row in enumerate(body_rows):  # reference KEEP §2.10.3
+            if pos in skip:
+                sh = bound_sh[pos + K + 2]
+                for jj in range(body_end, body_end + l_arg):
+                    slots.append(arg_slot(ring, rows[jj], sh, d_arg_root))
+            else:
+                slots.append(body_slot(row, d_lam))
     for j in range(body_end + l_arg, len(rows)):   # suffixe : copie directe
         slots.append(cs.slot_pattern_from_row(rows[j]))
     return slots

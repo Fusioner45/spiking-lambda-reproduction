@@ -112,9 +112,18 @@ the next reduction step come out of the copy memories, not out of a
 symbolic re-encoding. The slot patterns are composed from the current
 term's emissions: copies of the source patterns, phase-ring shifts for
 the inserted argument tokens (the carry is read off the ring's observed
-wraps), and the Section 2.10.3 KEEP rule applied channel by channel.
-A differential test checks this composition against the re-encoding
-canal by canal on every step. Each slot stores 7 phase channels: the 4
+wraps), and — for the kept body tokens — the anchored depth counter and
+the ordinal BIND wave of the real re-scan circuit (v3c; the nested-SCAN
+stack of `rescan_circuit.py`). The KEEP depth decrements are therefore
+no longer applied by the meta-controller: the anchored re-scan counter
+IS the decrement, and the binder depths are read off the live INTG
+stack by the physical BIND bus. The only channel-level rule left in the
+meta-controller is the -1 on the free-variable index (free indices
+count lambdas above the body, which the scan does not traverse — the
+same status as the paper's own Python, Section 2.11; a neural free
+port is future work). Differential tests check the composition against
+the re-encoding canal by canal on every step, for both the symbolic
+reference and the neural path. Each slot stores 7 phase channels: the 4
 paper channels (self and binder phases), a type channel (the paper
 carries token identity on distinct populations, Section 2.1), and 2
 channels for the free-variable index; for bound variables the index is
@@ -122,17 +131,9 @@ already recoverable from the binder channels (n = d - 1 - b). Any
 silent channel is detected at readout, so a corrupted memory stops the
 loop instead of silently corrupting the reduction.
 
-**Remaining gap vs the paper.** The KEEP decrement (-1 on the body
-tokens whose enclosing lambda disappears) is applied channel by
-channel in the meta-controller, exactly as the paper's own Python
-assembles its output events (Section 2.11); the routing decisions
-(which slot receives which token) come from the real circuits. Making
-the decrement neural, through a re-scan of the body by nested SCAN
-circuits, is the next architectural step.
-
 ## Status and limits
 
-All 16 validation banks pass. Known limits, documented in the note:
+All 17 validation banks pass. Known limits, documented in the note:
 the balance counter drifts on subterms longer than ~30 tokens (a
 tau_m >= 1000 ms fix is included), and the binding circuit has a
 measured sensitivity to one-bit phase noise (see the noise study).
