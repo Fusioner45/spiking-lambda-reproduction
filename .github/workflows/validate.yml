@@ -27,7 +27,7 @@ jobs:
           for b in run_demo run_bridge run_det run_freevars run_intg \
                    run_persist run_copy run_bind run_ring run_loop \
                    run_snn_core run_robustness run_noise run_envelope \
-                   run_scale run_cube run_rescan run_multiplex run_ablation run_stress; do
+                   run_scale run_cube run_rescan run_multiplex run_ablation run_stress \n                   run_balance; do
             echo "=== $b ==="
             python "$b.py"
           done

@@ -9,7 +9,7 @@ at bit-exact learned-weight equality; each bench states which components
 are compared.
 
 Repository: https://github.com/Fusioner45/spiking-lambda-reproduction
-(MIT, continuous integration, 20 validation benchmarks).
+(MIT, continuous integration, 21 validation benchmarks).
 
 To keep the scientific bookkeeping clean, the results below are sorted into
 three categories: **Reproduction** (behaviors matching the paper's
@@ -63,6 +63,14 @@ Corrections measured since the first note:
   the same structure with a much shorter L_max: on the PLUS family, 8+8
   stays inside the envelope and 9+8 crosses it, and the loop refuses
   the crossed case instead of computing a wrong result.
+* **Positional balance counter (proposed amendment, spec validated).**
+  The same balance can be held exactly on the paper's own two-digit
+  phase-grid mechanics (Section 2.7, extended to reverse stepping) with
+  signed carries and a Section 2.6 coincidence comparator for the
+  discharge: exact on the worst-case family (3 to 149 tokens) where the
+  analog counter lands 2 to 27 slots early, and on every reduction step
+  of the battery. The event contract for the circuit is validated; the
+  spiking circuit itself is in progress.
 * **Free-variable index.** The published encoding binds free variables to
   a reserved phase code and drops their index. The fix combines the
   reserved code with two index channels in the slot encoding, is

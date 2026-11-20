@@ -43,6 +43,15 @@ PERSIST/GATE/SCAN orchestration.
   traces, refractories) re-initialized, not restored (`run_cube.py`;
   an open-term variant is kept as a documented strict expected failure,
   see the note).
+* Positional balance counter (`run_balance.py`,
+  `docs/design_balance_counter.md`): the paper's analog balance
+  counter drifts on wide bodies (measured: the discharge lands 2, 7
+  and 27 slots early at 39, 69 and 149 tokens on the worst-case shape,
+  even at tau_m = 1000 ms). Holding the same balance on the paper's
+  own two-digit phase-grid mechanics (Section 2.7) with signed carries
+  and a coincidence comparator (Section 2.6) is exact on the whole
+  family and on every reduction step of the battery. The spec and its
+  event contract are validated; the spiking circuit is next (B-2).
 
 See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and
@@ -97,9 +106,10 @@ python run_snn_core.py    # differential test: Python engine vs C engine
 | `gated_chain.py` | neural GATE_BOUND: routed projections + LIF gate per tap (m5) |
 | `persist_gate.py` | PERSIST / GATE / SCAN, Sections 2.9-2.10 |
 | `free_vars_fix.py` | reserved phase code for free variables (fix for Section 3.3) |
+| `balance_digits.py` | positional balance counter spec: base-8 signed digits, carry events, comparator (chantier B) |
 | `orchestrate.py` | closed-loop Algorithm 1 with topographic event assembly |
 | `snn_core.c` / `snn_core.py` | bit-faithful C core + ctypes wrapper |
-| `run_*.py` | one validation bank per stage, plus robustness, noise, multiplexing and stress |
+| `run_*.py` | one validation bank per stage, plus robustness, noise, multiplexing, stress and balance |
 
 ## Scope: what runs on spikes, what runs in Python
 
@@ -200,7 +210,7 @@ weakenings.
 
 ## Status and limits
 
-All 20 validation benchmarks pass. Known limits, documented in the note:
+All 21 validation benchmarks pass. Known limits, documented in the note:
 the balance counter drifts on wide bodies even with the tau_m >= 1000 ms
 fix (on the measured x^n shape the discharge is exact at 15 tokens and
 wrong at 39), and the binding circuit has a measured sensitivity to
