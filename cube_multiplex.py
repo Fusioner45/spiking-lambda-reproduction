@@ -94,12 +94,14 @@ def learn_counted(bank, pattern, ctr, engine):
         bank.learn(bits)                    # mecanique v1 inchangee
         ctr["cycles"] += copy_stdp.N_CYCLES
         ctr["src"] += copy_stdp.N_CYCLES * len(bits)
+        ctr["fanin"] += copy_stdp.N_CYCLES * len(bits)
         ctr["dst"] += snn_core._LIB.cp_n_spikes(bank.h) - n0
     else:
         for _c in range(copy_stdp.N_CYCLES):
             for k in bits:
                 bank.schedule_src(k, copy_stdp.SRC_OFFSET_MS)
                 ctr["src"] += 1
+                ctr["fanin"] += 1
             for _ in range(steps_per_cycle):
                 ctr["dst"] += len(bank.step(True))
             ctr["cycles"] += 1
@@ -163,6 +165,7 @@ def run_chain(raw, taps, engine="py", bank_hook=None, ctr=None):
                             t0 + c * steps_per_cycle + offset_steps)
                         if ctr is not None:
                             ctr["src"] += 1
+                            ctr["fanin"] += 1
             n0_chain = snn_core._LIB.cp_n_spikes(chain.h)
             snn_core._LIB.cp_run(chain.h, n_cycles * steps_per_cycle, 0)
             if ctr is not None:
@@ -192,6 +195,7 @@ def run_chain(raw, taps, engine="py", bank_hook=None, ctr=None):
                         banks[s].schedule_src(k, copy_stdp.SRC_OFFSET_MS)
                         if ctr is not None:
                             ctr["src"] += 1
+                            ctr["fanin"] += 1
                 for _ in range(steps_per_cycle):   # pas de temps PARTAGES
                     if ctr is not None:
                         ctr["dst"] += len(chain.step(False))

@@ -187,12 +187,12 @@ def main():
             walls_d, walls_m = [], []
             ref = None
             for rep in range(REPS):
-                ctr_d = {"cycles": 0, "src": 0, "dst": 0}
+                ctr_d = {"cycles": 0, "src": 0, "fanin": 0, "dst": 0}
                 t0 = time.perf_counter()
                 banks_d = copy_direct(case, ctr_d)
                 walls_d.append(time.perf_counter() - t0)
 
-                ctr_m = {"cycles": 0, "src": 0, "dst": 0}
+                ctr_m = {"cycles": 0, "src": 0, "fanin": 0, "dst": 0}
                 t0 = time.perf_counter()
                 banks_m = copy_mux(case, taps, ctr_m)
                 walls_m.append(time.perf_counter() - t0)
@@ -234,6 +234,8 @@ def main():
             rows.append({
                 "n_bound": n_bound, "k_num": k_num, "l_arg": l_arg,
                 "n_slots": n_slots, "n_arg": n_arg, "prep_mux_ms": prep_mux_ms,
+                "fanin_d": n_slots * 42, "fanin_m": n_arg * 42,
+                "fanin_g": n_arg * l_arg * 42,
                 "d": {"cycles": ctr_d["cycles"], "src": ctr_d["src"],
                       "dst": ctr_d["dst"], "bancs": n_slots,
                       "wall": sorted(walls_d)[REPS // 2] * 1000.0},
@@ -251,6 +253,9 @@ def main():
                       % (n_bound, k_num, l_arg, n_slots, mode,
                          r["cycles"], r["src"], r["dst"],
                          56 * bancs, 56 * bancs, bancs, r["wall"]))
+            print("    fan-in (evenements post-synaptiques recus par les"
+                  " DST) : sequentiel=%d ; multiplexe=%d"
+                  % (rows[-1]["fanin_d"], rows[-1]["fanin_m"]))
 
     print()
     print("RESUME DES GAINS (cycles theta, simules — pas du wall-clock) :")
@@ -315,7 +320,7 @@ def main():
                                ring_mx)
         raw, groups = cm.arg_chain_plan(rows, K, l_body, l_arg, bound_sh)
         n_arg = len(raw) * len(groups)
-        ctr_g = {"cycles": 0, "src": 0, "dst": 0}
+        ctr_g = {"cycles": 0, "src": 0, "fanin": 0, "dst": 0}
         chain_g = gc.GatedChain(raw, groups, pats)
         t0 = time.perf_counter()
         chain_g.run(ctr=ctr_g)
@@ -353,6 +358,9 @@ def main():
         print("  (n=%d, k=%d) l_arg=%-3d  %7d %8d %8d %10d %8.1f"
               % (n_occ, k_num, l_arg, ctr_g["cycles"], ctr_g["src"],
                  ctr_g["dst"], wiring, wall_g))
+        print("      fan-in (le DIFFUSER livre a tous les taps) = %d —"
+              " l'O(n_bound x l_arg) a bascule des emissions vers le"
+              " fan-in" % ctr_g["fanin"])
     print("  (le cablage = les tables de routage n_arg x l_arg x 7 ;")
     print("  c'est la ressource que le mode evenements du m4 payait en")
     print("  emissions — le GATE_BOUND la transforme en cablage.)")

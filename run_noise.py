@@ -79,7 +79,7 @@ def vars_of(rows, k):
             and r[0] >= 4]
 
 
-def run_term(S, require_body_free=False):
+def run_term(S, require_body_free=False, wide=False):
     """Bloc 9 sur UN terme : controle sans bruit + Monte-Carlo 40
     tirages x {5 %, 10 %} x {multi, onehot}, proprietes robustes."""
     t = lb.parse(S)
@@ -206,10 +206,65 @@ def run_term(S, require_body_free=False):
             assert prev_fp == 0, (p, prev_fp)
         else:
             # a 10 % elle les divise au moins par 2 (k=7 vs k=1) ; le
-            # residuel est structurel (positions vulnérables a un bit du
+            # residuel est structurel (positions vulnerables a un bit du
             # lambda) — reste ouvert : hysteresis WTA ou presentation
             # asymetrique
             assert prev_fp * 2 <= fp_first, (p, prev_fp, fp_first)
+
+    # VALIDATION ELARGIE (revue externe session 31) : 100 tirages,
+    # k=1 vs k=7, TROIS GRAINES, la regle des trois (0/n -> p_max ~= 3/n
+    # -- 0 observe sur n ne vaut pas une garantie < 5 %)
+    # (sur le terme critique uniquement : le harnais py est lent)
+    if not wide:
+        return
+    # k=1 vs k=7, TROIS GRAINES, la regle des trois (0/n -> p_max ≈ 3/n
+    # — 0 observe sur n ne vaut pas une garantie < 5 %)
+    print("  validation elargie (100 tirages, 3 graines, k=1 vs k=7) :")
+    worst = {"fp": 0, "ff": 0}
+    for p in [0.05, 0.10]:
+        for seed in (3000, 4000, 5000):
+            line = {}
+            for n_pres in (1, 7):
+                n_trials, n_miss, n_fp, n_ff = 100, 0, 0, 0
+                rng = random.Random(seed + n_pres)
+                for _ in range(n_trials):
+                    masks = []
+                    for _r in range(n_pres):
+                        nz = noisy_channels(rows, k, p, rng,
+                                            decode="multi")
+                        c = bg.BindCircuit(rows, k, body_end=body_end,
+                                           noisy=nz)
+                        masks.append(c.run()["bound"])
+                    thr = n_pres // 2 + 1
+                    votes = {}
+                    for m in masks:
+                        for pos in m:
+                            votes[pos] = votes.get(pos, 0) + 1
+                    mask = sorted(pos for pos, cnt in votes.items()
+                                  if cnt >= thr)
+                    missed = [x for x in truth if x not in mask]
+                    false = [x for x in mask if x not in truth]
+                    if missed:
+                        n_miss += 1
+                    if false:
+                        n_fp += 1
+                    if any(x in free_idx for x in false):
+                        n_ff += 1
+                line[n_pres] = (n_fp, n_ff)
+                pmax = " ; p_max(regle des trois)=%.0f%%" % (300.0 / n_trials) \
+                    if n_fp == 0 else ""
+                print("    p=%.0f%% graine=%d k=%d : faux lies %d/100%s ; "
+                      "manques %d ; libres marques %d"
+                      % (100 * p, seed, n_pres, n_fp, pmax, n_miss, n_ff))
+                assert n_miss == 0, (p, seed, n_pres, "manque a 100 tirages")
+                worst["fp"] = max(worst["fp"], n_fp)
+                worst["ff"] = max(worst["ff"], n_ff)
+            # la reduction tient a l'echelle elargie : k=7 < k=1
+            assert line[7][0] < line[1][0] or line[1][0] == 0, \
+                (p, seed, "k=7 ne reduit pas les faux lies", line)
+            assert line[7][1] == 0, (p, seed, "libre marque a k=7")
+    print("    pires comptes sur 3 graines x 100 tirages : faux lies %d,"
+          " libres marques %d" % (worst["fp"], worst["ff"]))
 
 
 def main():
@@ -219,7 +274,7 @@ def main():
 
     run_term(S)
     print()
-    run_term(S_BODY_FREE, require_body_free=True)
+    run_term(S_BODY_FREE, require_body_free=True, wide=True)
 
     print()
     print("BLOC 9 : en presentation multi-bits, les proprietes robustes")

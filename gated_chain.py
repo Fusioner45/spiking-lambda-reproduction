@@ -164,6 +164,10 @@ class GatedChain:
                     pre = canals if _s == offset else []
                     if ctr is not None and pre:
                         ctr["src"] += len(pre)
+                        # le DIFFUSER : chaque fenetre est livree a
+                        # TOUS les taps — le fan-in porte le cout que
+                        # le m4 comptait en relais d'emission
+                        ctr["fanin"] += len(pre) * len(self.taps)
                     for tap in self.taps.values():
                         spiked = tap.step(pre, i)
                         if ctr is not None:
