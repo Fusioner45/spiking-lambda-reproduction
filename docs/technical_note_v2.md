@@ -9,7 +9,7 @@ at bit-exact learned-weight equality; each bench states which components
 are compared.
 
 Repository: https://github.com/Fusioner45/spiking-lambda-reproduction
-(MIT, continuous integration, 20 validation banks).
+(MIT, continuous integration, 20 validation benchmarks).
 
 To keep the scientific bookkeeping clean, the results below are sorted into
 three categories: **Reproduction** (behaviors matching the paper's
@@ -39,32 +39,36 @@ tested scope.
 Corrections measured since the first note:
 
 * **Balance-counter envelope (finding 8, extended).** The paper's balance
-  counter uses tau_m = 300 ms and its envelope is limited: on a term of
-  9 applied to 8 the counter fails (the loop refuses to compute a wrong
-  result and stops). A recalibrated variant with tau_m >= 1000 ms extends
-  the envelope: 16+16 reduces to Church 32 with exact traces. Both
-  parameterizations remain runnable: 300 ms is the default (fidelity), the
-  recalibrated value is opt-in per loop. The falsifiable form of the
-  envelope is a critical length L_max: the body length beyond which the
-  residual horizontal drift makes the counter's discharge wrong. The
-  measured drift trajectory comes first: on the x^n shape at
-  tau_m = 1000 ms, the 39-token body already discharges two slots early
-  (the measured length is 37 instead of 39), with the error growing
-  monotonically (10 percent at 69, 18 percent at 149). The drift is
-  trajectory-shape dependent (the x^n body drives the counter to its
-  worst-case dive, while the 65-token argument of mult 5 5 discharges
-  exactly). L_max itself, the first body length whose discharge is
-  wrong, is bracketed but not pinned on this shape: the x^8 body
-  (15 tokens) discharges exactly in the copy benchmarks at
-  tau_m = 1000 ms, and the 39-token body is already wrong, so L_max
-  lies between those measured points. The tau_m = 300 default has the
-  same structure with a much shorter L_max: on the PLUS family, 8+8
+  counter uses tau_m = 300 ms and its envelope is limited: on PLUS 9 8
+  (Church numerals 9 and 8) the counter fails (the loop refuses to
+  compute a wrong result and stops). A recalibrated variant with
+  tau_m >= 1000 ms extends the envelope: 16+16 reduces to Church 32 with
+  exact traces. Both parameterizations remain runnable: 300 ms is the
+  default (fidelity), the recalibrated value is opt-in per loop. The
+  falsifiable form of the envelope is a critical length L_max: the body
+  length beyond which the residual horizontal drift makes the counter's
+  discharge wrong. The measured drift trajectory comes first: on the
+  x^n shape (a body of n nested occurrences of x) at tau_m = 1000 ms,
+  the 39-token body already discharges two slots early (the measured
+  length is 37 instead of 39), with the error growing monotonically
+  (10 percent at 69, 18 percent at 149). The drift is trajectory-shape
+  dependent (the x^n body drives the counter to its worst-case dive,
+  while the 65-token argument of mult 5 5 discharges exactly). L_max
+  itself, the first body length whose discharge is wrong, is bracketed
+  but not pinned on this shape: the x^8 body (15 tokens) discharges
+  exactly in the copy benchmarks at tau_m = 1000 ms, and the 39-token
+  body is already wrong, so L_max lies between those measured points.
+  This bracket is an empirical interval on the tested shape, not a
+  general bound over arbitrary term shapes. The tau_m = 300 default has
+  the same structure with a much shorter L_max: on the PLUS family, 8+8
   stays inside the envelope and 9+8 crosses it, and the loop refuses
   the crossed case instead of computing a wrong result.
 * **Free-variable index.** The published encoding binds free variables to
   a reserved phase code and drops their index. The fix combines the
   reserved code with two index channels in the slot encoding, is
-  collision-free up to depth 62, and is validated circuit-level under
+  collision-free up to depth 62 (the 8 x 8 = 64 phase pairs include the
+  depth-63 code (7,7), which is reserved for free variables, so usable
+  depths run 0 to 62), and is validated circuit-level under
   10 percent phase noise.
 
 ## 2. Living working-memory cube (Extension)
@@ -87,7 +91,8 @@ the cube network is re-created fresh (membrane potentials, synaptic
 traces and refractory timers are re-initialized, not restored), the
 weights are reloaded, and the term is read back from the memories by
 recall; the reduction then continues. Tested scope: one interruption
-point (k=2), one term (2 I), one engine (Python); the scope is small and
+point (k=2), one term (2 I, Church 2 applied to the identity), one
+engine (Python); the scope is small and
 stated. The resumed trace and the final normal form are identical to the
 uninterrupted reference. This demonstrates a rebuild-from-weights
 protocol: the weights alone carry everything required to reconstruct the
@@ -95,12 +100,14 @@ term and continue. It does not demonstrate restoring the complete
 dynamical state (potentials, traces, refractories), which is a distinct
 and stronger claim we do not make.
 
-Status (closed-complete, operational definition). For closed terms, the
-neural memory cube carries the complete state required for continuation
-and reduction. For terms containing free variables whose indices depend
-on binders outside the scanned body, the index update remains
-meta-controlled (the scan cannot see binders above the body), so the
-neural path is complete on closed terms and hybrid exactly there.
+Status (closed-complete, operational definition). Architecturally, for
+closed terms the neural memory cube is intended to carry the complete
+state required for continuation and reduction, and the interruption and
+resume experiment above is a first operational demonstration of this on
+the tested configuration. For terms containing free variables whose
+indices depend on binders outside the scanned body, the index update
+remains meta-controlled (the scan cannot see binders above the body), so
+the neural path is complete on closed terms and hybrid exactly there.
 
 ## 3. Neural rescan and ordinal BIND bus (Extension)
 
@@ -110,7 +117,7 @@ anchored at the redex lambda's depth (the anchoring IS the decrement: no
 minus-one rule is applied anywhere), and the binder depths read by an
 ordinal wave: a chain descends the level stack, active gate-read neurons
 answer once, closed ones relay without answering, and the (n+1)-th answer
-in ordinal order is the binder.
+in ordinal order is the binder (for de Bruijn index n).
 
 Two limit regimes are measured:
 
@@ -143,7 +150,8 @@ signalling) sat at indices 100 and 101, and from depth 25 the per-level
 gate neurons reach those same indices (the 25th lambda's gate is index
 100), so every global bus pulse struck the deep levels directly and the
 whole stack closed on the first read at depth 32. The fix moves the
-global ports to 1000 and 1001. The nominal benches (depths <= 5) could
+global ports to 1000 and 1001, well above the indices the level neurons
+can reach in the tested depth range. The nominal benches (depths <= 5) could
 never have observed this; the discovery came from scaling the depth, not
 from a content differential. We record it as an addressing constraint:
 the flat address plan shared between the global buses and the
@@ -160,21 +168,25 @@ weights are bit-exact against the per-occurrence write on both engines,
 and invariant under the tap creation order.
 
 The formal cost comparison measures both modes at bit-exact output and
-final-weight equality, with the costs sorted into three categories. The
-metrics that matter for a physical reading are the simulated theta
-cycles, the synaptic operations (emissions and post-synaptic fan-in) and
-the projection-table footprint:
+final-weight equality, with the costs sorted into three categories.
+Here n_direct is the number of destination slots written directly (the
+kept body slots, not derived from the argument), n_arg = n_bound x l_arg
+is the number of argument-derived destination banks across all
+occurrences, n_slots = n_direct + n_arg, and l_arg is the argument
+length in tokens. The metrics that matter for a physical reading are the
+simulated theta cycles, the synaptic operations (emissions and
+post-synaptic fan-in) and the projection-table footprint:
 
 | Cost category | What is counted | Sequential | Multiplexed |
 | --- | --- | --- | --- |
 | Dynamic | simulated theta cycles | n_slots x 6 | (n_direct + l_arg) x 6 |
 | Dynamic | SRC events | n_slots x 42 | (n_direct + l_arg + n_arg) x 42 |
 | Dynamic | DST spikes | measured, identical | measured, identical |
-| Structural | post-synaptic fan-in per destination bank (max) | 42 | 42 (each tapped bank receives only its own window) |
-| Structural | post-synaptic fan-in, total | n_slots x 42 | n_slots x 42 (n_arg x 42 of them delivered by the chain) |
+| Structural | post-synaptic fan-in per destination bank (max) | 42 | 42 (own window only) |
+| Structural | post-synaptic fan-in, total | n_slots x 42 | n_slots x 42 (n_arg x 42 via the chain) |
 | Structural | neurons, synapses | unchanged | unchanged (+1 chain emitter) |
 
-Fan-in, measured on the family (n_bound=8, l_arg=19, n_slots=47): 1974
+Fan-in, measured on the family (n_bound=8, l_arg=5, n_slots=47): 1974
 post-synaptic events in both modes; the chain delivers 1680 of them
 (n_arg=40, 40 x 42) and the direct banks receive theirs as in the
 sequential mode. Per-bank fan-in is 42 events in both modes: the
@@ -183,9 +195,9 @@ multiplexed chain does not inflate it.
 Two short caveats. The multiplexed mode's SRC events include the routing
 relays (materialized as re-scheduled events in our harness); in a
 physical realization they would be the same spikes arriving through
-gates. The wall-clock is engine overhead of our serialized Python
-harness (the biologically parallel banks run one by one, so it is
-higher), it is never summed with the simulated cycles, and it is not a
+gates. Wall-clock runtime reflects the overhead of our serialized Python
+harness (the biologically parallel banks are stepped sequentially), is
+never summed with the simulated cycles, and is not treated as a hardware
 cost metric here.
 
 ## 5. Neural GATE_BOUND (Extension, preliminary)
@@ -200,12 +212,13 @@ counted as a resource (n_arg x l_arg x 7 routing-table entries). The
 cost trade-off is measured on both sides: the event-based mode pays the
 routing in emissions, the wired mode pays it in fan-in and wiring, at
 identical final weights and recall. Measured on the two harness
-families: (n_occ=2, l_arg=7, 14 taps) gives 294 SRC events (the raw
-chain emission, 7 x 6 x 7), 686 routing-table entries and 4116 delivered
-post-synaptic events (14 taps x 7 windows x 42); (n_occ=4, l_arg=11,
-44 taps) gives 462 SRC events, 3388 routing-table entries and 20328
-delivered events (44 x 11 x 42). The per-tap fan-in rises from 42 (own
-window only) to l_arg x 42 (every window delivered by the diffuser).
+families: (n_occ=2, l_arg=7, so n_arg = 14 taps) gives 294 SRC events
+(the raw chain emission, 7 x 6 x 7), 686 routing-table entries and 4116
+delivered post-synaptic events (14 taps x 7 windows x 42); (n_occ=4,
+l_arg=11, so n_arg = 44 taps) gives 462 SRC events, 3388 routing-table
+entries and 20328 delivered events (44 x 11 x 42). The per-tap fan-in
+rises from 42 (own window only) to l_arg x 42 (every window delivered
+by the diffuser).
 
 This block is preliminary: the reference implementation is Python-only.
 The production write path still uses the event-based multiplexed chain on
@@ -225,7 +238,8 @@ universal claim.
 **Noise.** The binding circuit's sensitivity to one-bit phase noise
 (finding 9) has a measured mitigation: a majority vote over repeated
 multi-bit presentations, with independent noise draws. At 40 trials on
-the first battery term, the vote eliminates the false bindings at
+the iteration term (\f. \x. f (f (f x))) (\x. x y), the vote eliminates
+the false bindings at
 5 percent noise (6/40 at k=1 to 0/40 at k=7) and halves them at
 10 percent (11/40 to 5/40) with a structural residual (positions one bit
 away from the lambda re-fire often). Misses stay at zero everywhere: the
@@ -233,11 +247,16 @@ noise only adds bits, a true coincidence fires in every presentation,
 and the majority cannot lose one. The cost is k times the presentation
 duration.
 
-The critical term (a free variable inside the body, presented to the
-circuit) was then re-measured at the widened scale, with the same
-majority-vote protocol and independent noise draws: 100 trials PER
-SEED, three seeds, so 300 trials per cell. False-binding trials per
-seed:
+The critical free-variable term (\f. f (g f)) h (a free variable inside
+the body, presented to the circuit) was then re-measured at the widened
+scale, with the same majority-vote protocol and independent noise
+draws: 100 trials per seed, three seeds, so 300 trials per cell. One
+trial is one majority vote over k noisy presentations, each
+presentation's noise drawn independently; a trial counts as a
+false-binding trial when the voted mask binds any non-truth position,
+and as a miss when it loses any true position. The seeds control the
+noise generator only; the circuit itself is deterministic.
+False-binding trials per seed:
 
 | Noise | k | Seed 3000 | Seed 4000 | Seed 5000 | Total |
 | --- | --- | --- | --- | --- | --- |
@@ -250,14 +269,15 @@ All three false-binding trials at k=1 under 10 percent noise mark the
 free variable (the rare marking also seen at 40 trials, 1/40 at k=1,
 crushed from k=3); at k=7 the vote crushes them at both noise levels,
 0/300 with zero misses. The two batteries do not contradict each other:
-the 10 percent residual is term-dependent. On the first battery term it
+the 10 percent residual is term-dependent. On the iteration term it
 concentrates on positions one bit away from a lambda, which re-fire
-often enough to clear the majority; on the critical term the only false
-bindings observed are free-variable markings, which are rare per draw
-and do not survive k=7 independent draws. The zero counts carry
-rule-of-three bounds, not guarantees: 0/100 bounds a per-seed rate at
-about 3 percent, and 0/300 bounds it at about 1 percent. A 1000-trial
-multi-seed study is future work.
+often enough to clear the majority; on the critical free-variable term
+the only false bindings observed are free-variable markings, which are
+rare per draw and do not survive k=7 independent draws. The zero counts
+carry rule-of-three bounds, not guarantees (3/n is the 95 percent
+one-sided upper bound after n zero-count trials): 0/100 bounds a
+per-seed rate at about 3 percent, and 0/300 bounds it at about
+1 percent. A 1000-trial multi-seed study is future work.
 
 ## 7. Limitations and open problems
 
@@ -294,5 +314,5 @@ multiplexed write with a neural gate, each validated differentially at
 bit-exact equality against a symbolic reference, with the cost trade-offs
 measured in three cost categories. The limits are documented rather than
 hidden, and the experiments that contradicted our own assumptions (the
-falsifiable envelope, the concurrency verdict, the one-bit attribution
-correction) are kept in the record.
+falsifiable envelope, the concurrency verdict, the Section 2.10.2
+attribution correction) are kept in the record.

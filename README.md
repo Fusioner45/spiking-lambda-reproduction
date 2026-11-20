@@ -197,7 +197,7 @@ weakenings.
 
 ## Status and limits
 
-All 20 validation banks pass. Known limits, documented in the note:
+All 20 validation benchmarks pass. Known limits, documented in the note:
 the balance counter drifts on wide bodies even with the tau_m >= 1000 ms
 fix (on the measured x^n shape the discharge is exact at 15 tokens and
 wrong at 39), and the binding circuit has a measured sensitivity to
