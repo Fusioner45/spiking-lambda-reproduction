@@ -131,7 +131,10 @@ already recoverable from the binder channels (n = d - 1 - b). Any
 silent channel is detected at readout, so a corrupted memory stops the
 loop instead of silently corrupting the reduction.
 
-**Multiplexed argument copies (Section 4.5).** With
+**Multiplexed argument copies (an alternative to Section 2.10.2).**
+The paper's Section 2.10.2 creates one nested-SCAN chain `pos_arg`
+PER bound occurrence, triggered with staggered delays (O(n_bound)
+chains). Our multiplexed write addresses that cost differently: with
 `multiplexed=True` (the production default), writing the argument into
 the cube no longer costs one full copy per bound occurrence: a single
 chain of shared theta windows (one per argument token) serves ALL
@@ -142,6 +145,13 @@ addresses). The per-tap routing stays on the real phase ring, the tap
 gating remains meta-controller (the Section 2.11 boundary), and the
 differential benches prove the tapped weights are bit-exact against
 direct writes and invariant under tap interleaving, on both engines.
+The neural write path closes the loop bit-exactly for CLOSED terms
+(pure combinators, Church numerals, complete reductions): the
+living-cube state is closed-complete. Terms with variables bound
+OUTSIDE the redex still rely on the meta-controller's free-index
+decrement (the scan cannot see binders above the body), so the
+state is hybrid on external free-variable indices -- stated as
+such rather than claimed fully closed.
 The formal cost comparison (m4, `run_multiplex.py`) measures simulated
 theta cycles, SRC events, DST spikes, allocated resources and engine
 wall-clock for both modes on the (n_bound, l_arg) family at bit-exact

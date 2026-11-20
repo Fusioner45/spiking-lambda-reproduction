@@ -161,7 +161,9 @@ a differential bench: the composed cube (v2) must remain exactly equal.
 With v3 in place, the substitution cost argument becomes mechanical:
 today each bound occurrence triggers a full copy of the argument
 (n_bound x l_arg theta-cycle copies, Section 2.8 per token). The paper's
-Section 4.5 replaces this by a single temporal chain `pos_arg` of length
+the Section 2.10.2 scheme creates one nested-SCAN chain per occurrence
+(O(n_bound) chains, staggered delays); our alternative replaces that
+cost with a single temporal chain `pos_arg` of length
 l_arg, and every bound occurrence taps it through time addressing from
 GATE_BOUND. The composed-cube infrastructure makes the claim testable:
 slot patterns for all destinations come from one chain of copies, and
@@ -231,3 +233,16 @@ After v3: the meta-controller owns output ordering only (same as the
 paper's Section 2.11). After Item 3: it owns the initial cube and the
 halt check. Noise behavior of the neural binder stack is out of scope
 for v3 (Finding n.9 tracks it separately).
+
+Precise status (external review, session 31): the neural state is
+CLOSED-COMPLETE -- the write path closes the loop bit-exactly for
+closed terms; terms with variables bound outside the redex keep the
+meta-controller free-index decrement (the scan cannot see binders
+above the body), so the state is hybrid on external free-variable
+indices. The GATE_BOUND current follows the chain's emission state;
+the tap-to-window assignment remains a meta datum.
+Attribution correction (session 31): the paper's nested-SCAN
+mechanism is Section 2.10.2 (one pos_arg chain PER bound occurrence,
+staggered delays); Section 4.5 is Future directions (System F). The
+multiplexing implemented here is an alternative architecture
+addressing the per-occurrence cost of the Section 2.10.2 scheme.

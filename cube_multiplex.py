@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Multiplexage de la copie de l'argument (item 3, §4.5 — m1/m2/m3).
+"""Multiplexage de la copie de l'argument (item 3, m1/m2/m3).
 
 AUJOURD'HUI (v1-v3c) : chaque occurrence d'un VAR lie declenche la copie
 COMPLETE de l'argument — n_bound x l_arg emissions theta (§2.8, une
-sequence d'apprentissage par slot). Le papier §4.5 : UNE chaine
+sequence d'apprentissage par slot). Le papier §2.10.2 (nested
+SCANs) cree UNE chaine pos_arg PAR occurrence ; notre mode
+multiplexe : UNE chaine
+temporelle PARTAGEE par toutes les occurrences (architecture
+alternative repondant au cout du schema §2.10.2) — UNE chaine
 temporelle pos_arg de longueur l_arg, et chaque occurrence y puise par
 adressage temporel depuis GATE_BOUND.
 
@@ -111,7 +115,7 @@ def run_chain(raw, taps, engine="py", bank_hook=None, ctr=None):
 
     LE GATING (m4) : taps = liste (slot, pattern_route, fenetre) — le
     tap n'est programme que pendant SA fenetre (celle du token qu'il
-    destine ; c'est le role de GATE_BOUND §4.5, porte ici par la donnee
+    destine ; c'est le role de GATE_BOUND §2.10.2, porte ici par la donnee
     de fenetre, statut meta-controleur). Avant le m4, le tap re-recevait
     son pattern a CHAQUE fenetre : poids finaux inchanges (clamp W=8)
     mais flux SRC gonfle x l_arg et adressage temporel viole — detecte

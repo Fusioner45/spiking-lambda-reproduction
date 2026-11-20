@@ -114,7 +114,7 @@ def main():
               "(KEEP symbolique + re-scan NEURAL, canal par canal)"
               % (term, len(pats), len(spec)))
 
-    # 2b. MULTIPLEXAGE (item 3, §4.5 — m1+m2) : UNE chaine d'emission
+    # 2b. MULTIPLEXAGE (item 3, m1+m2) : UNE chaine d'emission
     #     pour l'argument, tous les taps apprennent en parallele ;
     #     differentiel poids bit-exact contre l'ecriture directe v1 et
     #     invariance de l'ordre des taps, sur les deux moteurs

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""m4 : COMPARAISON FORMELLE sequentiel vs multiplexe (item 3, §4.5).
+"""m4 : COMPARAISON FORMELLE sequentiel vs multiplexe (item 3).
 
 Baseline : `multiplexed=False` = NOTRE implementation sequentielle de
 reference (la copie §2.8 du papier, une emission theta par occurrence
