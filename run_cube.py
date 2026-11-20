@@ -251,6 +251,90 @@ def main():
         pass
 
     print()
+    # 5. INTERRUPTION/REPRISE (revue externe ChatGPT, session 31) : les
+    #    memoires du cube contiennent-elles TOUT l'etat ? on capture les
+    #    POIDS SEULS apres 3 etapes, on reconstruit le cube a partir des
+    #    poids seuls (sans aucun etat symbolique), on lit le terme et on
+    #    poursuit la reduction — la continuation doit etre identique a
+    #    la reference ininterrompue.
+    print("  interruption/reprise : l'etat = les memoires seules")
+    cap = {}
+
+    def _cap_hook(bank, slot, pattern):
+        cap[slot] = (pattern, list(cm.bank_weights(bank)))
+
+    term_resume = "(%s) (%s)" % (two, eye)
+    cur = lb.parse(term_resume)
+    trace_ref = [len(bd.to_tokens(bd.to_debruijn(cur)))]
+    loop = orc.ClosedLoop(living_cube=True, copy_engine="py",
+                          verbose=False, bank_hook=_cap_hook)
+    K_INT = 2                              # l'interruption apres 2 etapes
+    for _i in range(K_INT):
+        cap.clear()                    # la capture = le cube de CETTE
+        cur, rep = loop.step(cur)      # etape seulement
+        trace_ref.append(len(bd.to_tokens(bd.to_debruijn(cur))))
+    # GELE la capture : le hook continue de tirer pendant la reference
+    # ininterrompue (les bancs de la continuation ecraseraient cap) —
+    # la reprise se fait depuis l'etat de l'INTERRUPTION
+    cap_snapshot = dict(cap)
+    # la reference ininterrompue : la continuation jusqu'a la forme
+    # normale (None)
+    nf_ref = cur
+    for _i in range(6):
+        nxt, rep = loop.step(cur)
+        if nxt is None:
+            break
+        cur = nxt
+        nf_ref = cur
+        trace_ref.append(len(bd.to_tokens(bd.to_debruijn(cur))))
+    # la reprise : le cube reconstruit a partir des POIDS SEULS
+    cube_r = cs.CubeState(engine="py")
+    cube_r.slots = []
+    for s in sorted(cap_snapshot):
+        pat, w = cap_snapshot[s]
+        b = cm._new_bank("py", s)
+        b.w = list(w)
+        cube_r.slots.append((pat, b))
+    for s in sorted(cap):
+        pat, w = cap[s]
+        learned = [k for k in range(56) if w[k] >= 7.9]
+        want = [g * 8 + v for g, v in enumerate(pat)]
+        print("    cap[%d] : pattern=%s appris=%s attendu=%s %s"
+              % (s, pat, learned, want,
+                 "OK" if learned == want else "<<< DECALE"))
+    read_resume = cube_r.read_all()
+    print('    read_resume =', read_resume)
+    # le terme symbolique attendu apres 2 etapes (la reference) :
+    cur_ref = lb.parse(term_resume)
+    for _i in range(K_INT):
+        cur_ref, _d = lb.beta_step(cur_ref)
+    toks_ref = bd.to_tokens(bd.to_debruijn(cur_ref))
+    print('    tokens symboliques =', toks_ref)
+
+    cur_resume = bd.from_debruijn(bd.tokens_to_db(read_resume))
+    trace_resume = [len(read_resume)]
+    nf_resume = cur_resume
+    loop2 = orc.ClosedLoop(living_cube=True, copy_engine="py",
+                           verbose=False)
+    for _i in range(6):
+        nxt, rep = loop2.step(cur_resume)
+        if nxt is None:
+            break
+        cur_resume = nxt
+        nf_resume = cur_resume
+        trace_resume.append(len(bd.to_tokens(bd.to_debruijn(cur_resume))))
+    assert trace_resume == trace_ref[K_INT:], \
+        (trace_resume, trace_ref, K_INT)
+    assert lb.to_str(nf_resume) == lb.to_str(nf_ref), \
+        (lb.to_str(nf_resume), lb.to_str(nf_ref))
+    print("    trace ininterrompue : %s" % trace_ref)
+    print("    trace reprise (apres %d etapes, depuis les poids) : %s"
+          % (K_INT, trace_resume))
+    print("    forme finale identique : %s" % lb.to_str(nf_resume))
+    print("    LE CUBE PORTE TOUT L'ETAT — la reprise depuis les poids")
+    print("    seuls reproduit la continuation a l'identique")
+
+    print()
     print("CUBE VIVANT VALIDE — l'etat de la boucle vit dans les memoires.")
 
 
