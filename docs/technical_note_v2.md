@@ -103,20 +103,22 @@ traces and refractory timers are re-initialized, not restored), the
 weights are reloaded, and the term is read back from the memories by
 recall; the reduction then continues. Tested scope: a matrix of
 interruption points, terms and engines: k in {1, 2, 3} on 2 I
-(Church 2 applied to the identity) and k in {2, 4} on PLUS 2 3, each
-rebuilt from the weights alone on the Python and the C engine (nine
-closed-term cases; k = 3 resumes at the last step, where the read-back
-term is already the normal form). On every case the read-back term
-equals the symbolic term, and the resumed trace and final normal form
-equal the uninterrupted reference. An open-term variant exposed a
-pre-existing convention defect: to_debruijn assigns free-variable
-indices by appearance order and ignores the stable level suffixes that
-from_debruijn writes, so free-variable identity is not stable across a
-reduction that reorders them; the production differential cannot see
-it (the assembly is compared to itself), and the open-term cases stay
-in the bank as strict expected failures until the convention is fixed.
-The rebuild-from-weights conclusion holds for closed terms, which is
-exactly the closed-complete scope stated above. This demonstrates a
+(Church 2 applied to the identity) and k in {2, 4} on PLUS 2 3. The
+closed-term matrix contains nine cases across the Python and C engines;
+the open term `(\\x. x y) ((\\z. z) w)` adds one case on each engine,
+for eleven cases in total. The k = 3 case resumes at the last step,
+where the read-back term is already the normal form. On every case the
+read-back term equals the symbolic term, and the resumed trace and final
+normal form equal the uninterrupted reference.
+
+The open-term cases rely on the A-bis convention fix: `to_debruijn`
+honors the stable `_fN` level suffixes emitted by `from_debruijn`, so a
+free variable keeps its identity when a reduction reorders it. This
+fix replaces the earlier strict expected failures described in the first
+version of this note. The rebuild-from-weights conclusion is therefore
+tested on the listed closed and open cases; the architecture remains
+closed-complete in the operational sense defined below, while open terms
+retain the documented hybrid free-index update. This demonstrates a
 rebuild-from-weights protocol: the weights alone carry everything
 required to reconstruct the term and continue. It does not demonstrate
 restoring the complete

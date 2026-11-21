@@ -40,9 +40,9 @@ PERSIST/GATE/SCAN orchestration.
   (k in {1, 2, 3} on 2 I, k in {2, 4} on PLUS 2 3) on both engines: the
   term is read back from the memories and the reduction continues to
   the same trace and final form, with the dynamical state (potentials,
-  traces, refractories) re-initialized, not restored (`run_cube.py`;
-  an open-term variant is kept as a documented strict expected failure,
-  see the note).
+  traces, refractories) re-initialized, not restored. The matrix also
+  includes an open term on both engines; stable free-variable levels are
+  preserved across the interruption and resumption (`run_cube.py`).
 * Positional balance counter (`run_balance.py`,
   `docs/design_balance_counter.md`): the paper's analog balance
   counter drifts on wide bodies (measured: the discharge lands 2, 7
@@ -94,6 +94,28 @@ gcc -O2 -shared -fPIC -o libsnn_core.so snn_core.c -lm  # Linux/macOS
 gcc -O2 -shared -o snn_core.dll snn_core.c -lm        # Windows
 python run_snn_core.py    # differential test: Python engine vs C engine
 ```
+
+### Reproduce the validation suite
+
+After compiling the C core, run every validation bank locally with:
+
+```
+python run_all.py
+```
+
+`run_all.py` is the canonical local equivalent of the CI validation job:
+it runs the 21 banks in a fixed order, stops at the first failure, and
+refuses Python's optimized (`-O`) mode because that mode disables the
+assertions used by the validation scripts. The suite is standard-library
+only apart from the C compiler needed to build the C core; the C core is
+optional for Python-only experiments but required by the complete suite.
+
+| Command | What it checks |
+|---|---|
+| `python run_loop.py` | End-to-end closed-loop reductions, checked against the symbolic oracle at every step. |
+| `python run_snn_core.py` | Spike-for-spike Python/C differential checks. |
+| `python run_cube.py` | STDP living-cube writes, corruption detection, and interruption/resumption on closed and open terms. |
+| `python run_all.py` | All 21 circuit, robustness, scaling, noise, ablation, and integration banks. |
 
 ## Layout
 
@@ -218,7 +240,10 @@ weakenings.
 
 ## Status and limits
 
-All 21 validation benchmarks pass. Known limits, documented in the note:
+The CI runs all 21 validation banks. The checked properties are
+deterministic simulation results against this repository's symbolic oracle;
+they are evidence for this implementation, not a formal proof or an
+independent biological validation. Known limits, documented in the note:
 the balance counter drifts on wide bodies even with the tau_m >= 1000 ms
 fix (on the measured x^n shape the discharge is exact at 15 tokens and
 wrong at 39), and the binding circuit has a measured sensitivity to
