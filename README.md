@@ -49,9 +49,11 @@ PERSIST/GATE/SCAN orchestration.
   and 27 slots early at 39, 69 and 149 tokens on the worst-case shape,
   even at tau_m = 1000 ms). Holding the same balance on the paper's
   own two-digit phase-grid mechanics (Section 2.7) with signed carries
-  and a coincidence comparator (Section 2.6) is exact on the whole
-  family and on every reduction step of the battery. The spec and its
-  event contract are validated; the spiking circuit is next (B-2).
+  and an inhibitory comparator (Section 2.6) is exact on the whole
+  family and on every reduction step of the battery -- and the
+  spiking circuit itself is validated slot by slot against the spec
+  on both engines (`balance_circuit.py`): digits, carries and the
+  discharge position, exact where the analog counter drifts.
 
 See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and

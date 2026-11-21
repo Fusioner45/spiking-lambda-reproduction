@@ -1,7 +1,8 @@
 # Design note: a positional balance counter (chantier B)
 
-Status: spec designed and validated differentially (`run_balance.py`);
-the spiking circuit is B-2, future work.
+Status: spec AND spiking circuit designed and validated differentially
+(`run_balance.py`, both engines); the closed-loop integration is the
+next step (B-3).
 
 ## The measured defect of the analog counter
 
@@ -75,11 +76,49 @@ comparator fire. Measured contract on the x^20 body: 39 steps, 5
 upward and 5 downward carries, exactly one comparator fire at step 38
 with digits (1, 0, 0). The bench asserts these counts.
 
+## The circuit (B-2, validated)
+
+`balance_circuit.py` implements the spec with the paper's primitives:
+
+* **Digits.** 8 one-hot PERSIST neurons per digit (Section 2.9:
+  tau_m = 10, t_ref = 2, recurrent 9, ~483 Hz measured, ignition
+  >= 1.0, HALT -15 extinction). Exactly one active; the state holds
+  between tokens with no decay (the information lives in WHO fires,
+  not in an integrated potential).
+* **Transitions.** 8 T+ and 8 T- neurons per digit (tau_m = 10) read
+  the current state through the P's FAST spike trains (tau_syn = 2,
+  V_ss = 0.97 x weight, smooth) and fire on the VAR/APP broadcast
+  pulse (+0.74 over the 0.78 train): train alone < 1, train + pulse
+  > 1. Fire -> HALT the current P, ignite the neighbor.
+* **Carries.** Only the wrap neurons (T+[7], T-[0]) re-arm the next
+  digit's broadcast: the higher digits step ONLY on carries (the
+  paper's own coarse-register rule). Feeding the broadcast to the
+  higher digits' wrap neurons directly lets them fire on every token
+  (measured: the comparator accumulates and fires at slot 8 instead
+  of 14) -- the restriction is load-bearing.
+* **Comparator.** No analog sum: the comparator fires on the T+[0]
+  spike (the VAR 0->1 transition of the fine digit, the only path to
+  sigma = +1) UNLESS inhibited by any non-zero state of the higher
+  digits (the 14 P of d1.P[1..7], d2.P[1..7] inhibit). The false
+  T+[0] spikes (sigma -8 -> -7, +8 -> +9) see d1 or d2 non-zero and
+  are inhibited; d1 = d2 = 0 offers no inhibition. Exact by
+  construction.
+* **Timing.** The counter runs its own 25 ms/token clock (a free
+  parameter): the fresh P's train reaches 70 percent within one slot,
+  the dead P's train tail is gone, and all the analog margins are
+  >= 0.14. At the 8 ms token clock the margins close (measured: the
+  machine lags one slot, then freezes).
+* **Validation.** The differential against the spec is slot-by-slot
+  on both engines: digits, carries and the discharge position match
+  on x^8, x^20, I I, 2 I and the open term (10 cases). The discharge
+  positions are exact where the analog counter drifts by 2 to 27
+  slots.
+
 ## Open problems
 
-* The reverse-step circuit: a cyclic digit state driven from both
-  directions without ghost transitions (the Section 2.9 gating
-  mechanics are the candidate tool).
-* The comparator's timing: the coincidence window must span the digit
-  settling after a carry chain, not just one slot.
-* The C port of the new circuit (both-engine differential as usual).
+* The closed-loop integration (B-3): replacing the analog
+  IntgCircuit inside the loop, with the counter's 25 ms/token budget
+  accounted in the step's simulated time.
+* Deeper dives: the k = 3 digits cover [-128, 127]; a wider range is
+  a digit-count change, but the carries cascade through the chain
+  and their timing budget grows with it.

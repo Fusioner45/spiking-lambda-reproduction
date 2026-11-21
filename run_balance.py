@@ -27,6 +27,8 @@ import lambda_beta as lb
 import bridge_db as bd
 import intg_body
 import balance_digits as bdc
+import balance_circuit as bc
+import snn_core as sc
 
 two = "\\f. \\x. f (f x)"
 three = "\\f. \\x. f (f (f x))"
@@ -53,6 +55,25 @@ def spec_case(toks, K, n_digits=3):
     assert r["pos"] == truth, \
         ("spec != verite", K, r["pos"], truth, sigma)
     return r, truth
+
+
+def circuit_case(toks, K, engine, n_digits=3):
+    """Un cas B-2 : le circuit spiking contre la spec, slot par slot
+    (chiffres actifs, retenues, position de discharge)."""
+    spec = bdc.run_counter(toks, K, n_digits=n_digits)
+    nf = sc.CNetwork if engine == "c" else None
+    cir = bc.BalanceCircuit(toks, K, n_digits=n_digits, net_factory=nf)
+    r = cir.run()
+    assert r["pos"] == spec["pos"], \
+        ("discharge circuit != spec", engine, r["pos"], spec["pos"])
+    for j, ev in enumerate(spec["trace"]):
+        assert tuple(r["digits"][j]) == ev["digits"], \
+            ("chiffres circuit != spec", engine, j,
+             r["digits"][j], ev["digits"])
+        assert sorted(r["carries"][j]) == sorted(ev["carries"]), \
+            ("retenues circuit != spec", engine, j,
+             r["carries"][j], ev["carries"])
+    return spec["pos"]
 
 
 def main():
@@ -124,9 +145,29 @@ def main():
     assert last["digits"] == (1, 0, 0) and last["fired"], last
     print("    discharge : chiffres (1, 0, 0), comparateur feux une fois")
 
+    # 4. B-2 : le circuit spiking contre la spec, slot par slot
+    print("  B-2 circuit spiking vs spec (chiffres, retenues, decharge) :")
+    b2 = [
+        ("(\\x. " + " ".join(["x"] * 8) + ")", -1, "x^8"),
+        ("(\\x. " + " ".join(["x"] * 20) + ")", -1, "x^20"),
+        ("(%s) (%s)" % (eye, eye), None, "I I"),
+        ("(%s) (%s)" % (two, eye), None, "2 I"),
+        ("(\\x. x y) ((\\z. z) w)", None, "ouvert"),
+    ]
+    for term, K, name in b2:
+        cur = lb.parse(term)
+        toks = bd.to_tokens(bd.to_debruijn(cur))
+        if K is None:
+            K = bd.find_redex(cur)
+        for eng in ("py", "c"):
+            p = circuit_case(toks, K, eng)
+            print("    %-6s moteur %-2s : decharge au pas %d, chiffres +"
+                  " retenues == spec a chaque slot" % (name, eng, p))
+
     print()
     print("BALANCE POSITIONNELLE VALIDE — exacte la ou l'analogique"
-          " derive ; le circuit B-2 a son contrat d'evenements.")
+          " derive ; le circuit spiking reproduit la spec slot par slot"
+          " sur les deux moteurs.")
 
 
 if __name__ == "__main__":
