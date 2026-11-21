@@ -72,8 +72,9 @@ Corrections measured since the first note:
   of the battery, and the spiking circuit of this design is validated
   slot by slot against the spec on both engines. In the closed loop,
   the segmentation is exact at the paper's parameters: PLUS 9 8 and
-  PLUS 16 16 compute (the cases the analog counter refuses or misses)
-  without the recalibration.
+  PLUS 16 16 compute (the cases the analog counter refuses or misses),
+  and mult 5 5 runs to completion (Church 25) with exact segmentation
+  on 83-token terms.
 * **Free-variable index.** The published encoding binds free variables to
   a reserved phase code and drops their index. The fix combines the
   reserved code with two index channels in the slot encoding, is

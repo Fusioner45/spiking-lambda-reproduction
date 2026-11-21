@@ -196,31 +196,22 @@ def main():
             cur, _d = lb.beta_step(cur)
         exp_trace.append(len(bd.to_tokens(bd.to_debruijn(cur))))
         exp_nf = cur
+        # max_steps explicite : le defaut (8) coupait mult 5 5 — le
+        # « halt a l'enveloppe DET » consigne en session 38 etait une
+        # attribution jamais mesuree (le DET est exact jusqu'a 1002
+        # tokens, sonde session 41) ; la vraie cause = le harnais
         nf, trace, _rep = orc.ClosedLoop(
             verbose=False, balance_counter=True, copy_engine=eng,
-            net_factory=(sc.CNetwork if eng == "c" else None)).run(term)
-        if name == "mult 5 5":
-            # le compteur positionnel retire le mur finding-8 (la
-            # segmentation est exacte sur les termes de 83 tokens) ;
-            # le loop atteint ensuite l'enveloppe PROPRE du DET
-            # (l'espans des lignes de delai, ~70 tokens de terme) —
-            # la limite suivante, surfacee pour la premiere fois par
-            # ce fix (l'analogique mourait a 30 tokens avant)
-            assert trace == exp_trace[:len(trace)], (name, eng)
-            assert len(trace) == 8, (name, eng, len(trace))
-            print("    %-9s moteur %-2s : segmentation exacte %d etapes"
-                  " (termes jusqu'a %d tokens), puis halt a l'enveloppe"
-                  " DET documentee (~70 tokens) — la limite suivante"
-                  % (name, eng, len(trace) - 1, max(trace)))
-        else:
-            assert trace == exp_trace, (name, eng, trace, exp_trace)
-            # alpha-equivalence : la boucle reconstruit les noms des
-            # variables liees par niveaux — la comparaison se fait sur
-            # l'arbre De Bruijn (termes clos ici : exact)
-            assert bd.to_debruijn(nf) == bd.to_debruijn(exp_nf), \
-                (name, eng, bd.to_debruijn(nf), bd.to_debruijn(exp_nf))
-            print("    %-9s moteur %-2s : %2d etapes == oracle, forme"
-                  " finale %s" % (name, eng, len(trace), lb.to_str(nf)))
+            net_factory=(sc.CNetwork if eng == "c" else None)
+        ).run(term, max_steps=25)
+        assert trace == exp_trace, (name, eng, trace, exp_trace)
+        # alpha-equivalence : la boucle reconstruit les noms des
+        # variables liees par niveaux — la comparaison se fait sur
+        # l'arbre De Bruijn (termes clos ici : exact)
+        assert bd.to_debruijn(nf) == bd.to_debruijn(exp_nf), \
+            (name, eng, bd.to_debruijn(nf), bd.to_debruijn(exp_nf))
+        print("    %-9s moteur %-2s : %2d etapes == oracle, forme"
+              " finale %s" % (name, eng, len(trace) - 1, lb.to_str(nf)))
 
     print()
     print("BALANCE POSITIONNELLE VALIDE — exacte la ou l'analogique"

@@ -94,7 +94,7 @@ with digits (1, 0, 0). The bench asserts these counts.
   paper's own coarse-register rule). Feeding the broadcast to the
   higher digits' wrap neurons directly lets them fire on every token
   (measured: the comparator accumulates and fires at slot 8 instead
-  of 14) -- the restriction is load-bearing.
+  of 14): the restriction is load-bearing.
 * **Comparator.** No analog sum: the comparator fires on the T+[0]
   spike (the VAR 0->1 transition of the fine digit, the only path to
   sigma = +1) UNLESS inhibited by any non-zero state of the higher
@@ -122,23 +122,21 @@ the loop (l_body == truth, l_arg == truth) pass on every step.
 Results at the PAPER'S parameters (tau_m = 300, no recalibration):
 
 * PLUS 2 3: 6 reductions, Church 5 (the paper's trace);
-* PLUS 9 8: 6 reductions, Church 17 -- the case the analog counter
+* PLUS 9 8: 6 reductions, Church 17, the case the analog counter
   REFUSES at tau_m = 300 (finding 8's falsifiable envelope);
-* PLUS 16 16: 6 reductions, Church 32 -- the case that needed the
+* PLUS 16 16: 6 reductions, Church 32, the case that needed the
   tau_m >= 1000 recalibration.
 
 The finding-8 limitation is removed at the paper's own parameters.
-The mult 5 5 case runs 7 reductions with exact segmentation on terms
-up to 83 tokens, then the loop halts at the NEXT documented envelope:
-the DET circuit's delay-line span (~70-token terms, surfaced for the
-first time by this fix -- the analog counter masked it by dying at
-30 tokens first).
+The mult 5 5 case runs to completion: 13 reductions to Church 25,
+both engines, trace and normal form equal to the oracle, with exact
+segmentation on terms up to 83 tokens. (An earlier draft of this note
+reported a halt at the DET circuit's term span; that attribution was
+wrong: a direct probe shows the DET exact up to 1002-token terms, and
+the observed halt was the validation harness's own 8-step default.)
 
 ## Open problems
 
-* The DET circuit's term-span envelope (~70 tokens, measured here for
-  the first time): the delay-line span is the next analog limit to
-  revisit with the same positional/grid treatment.
 * Deeper dives: the k = 3 digits cover [-128, 127]; a wider range is
   a digit-count change, but the carries cascade through the chain
   and their timing budget grows with it.
