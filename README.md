@@ -72,6 +72,8 @@ Generated from the real circuits (`python make_figures.py`):
 ![Redex detection](assets/fig_det.png)
 ![Balance counter](assets/fig_intg.png)
 ![Phase ring](assets/fig_ring.png)
+![Positional balance counter](assets/fig_balance.png)
+![Multiplexing gains](assets/fig_multiplex.png)
 
 ## Quick start
 
