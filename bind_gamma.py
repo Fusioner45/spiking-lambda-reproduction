@@ -171,12 +171,19 @@ class BindCircuit:
 # ---- verite semantique (independante du circuit) ------------------------
 
 def truth_bound_indices(rows, k_redex, body_end=None):
+    """Les VAR du corps lies au lieur du redex. L'adresse du lieur
+    est FINE + COARSE (profondeur mod 8 et // 8, §2.6) : comparer la
+    fine seule faisait matcher les VAR a la profondeur d_lam + 8k (le
+    lieur d'un autre niveau — expose par append sur les listes
+    emboitees, session 43 ; le banc plus 2 3, profondeurs < 8, ne
+    pouvait pas le voir)."""
     d_lam = rows[k_redex + 1][1]
+    d_fine, d_coarse = d_lam % 8, d_lam // 8
     end = body_end if body_end is not None else len(rows)
     out = []
     for i, r in enumerate(rows):
         if (k_redex + 1 < i < end and r[0] >= 4 and not r[6]
-                and r[4] == d_lam):
+                and r[4] == d_fine and r[5] == d_coarse):
             out.append(i)
     return out
 
