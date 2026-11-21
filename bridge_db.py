@@ -26,24 +26,49 @@ K_F = K_C = 8
 
 # ---- noms -> De Bruijn --------------------------------------------------
 
-def to_debruijn(t):
-    """AST nominal -> arbre DB : ('lam', b) | ('app', f, a) | ('var', n).
-    Variables libres : index = hauteur courante + rang de premiere
-    occurrence (convention « levels »)."""
-    frees = []
+def free_level(name, rank):
+    """NIVEAU stable d'une variable libre : le suffixe _f<n> pose par
+    from_debruijn EST l'identite de la variable (son niveau ne change
+    pas d'une etape a l'autre) ; un nom sans suffixe (le terme initial
+    de l'utilisateur) prend le rang de premiere occurrence (l'encodage
+    initial, §2.11). Ignorer le suffixe re-classait les libres a chaque
+    etape : des qu'une reduction changeait leur ordre d'apparition,
+    les identites s'echangaient (chantier A, session 37)."""
+    if "_f" in name:
+        tail = name.rsplit("_f", 1)[1]
+        if tail.isdigit():
+            return int(tail)
+    return rank
 
+
+def to_debruijn_c(t, fmap):
+    """comme to_debruijn, mais les niveaux des libres passent par le
+    registre fmap (nom -> niveau, mute par la marche) : un nom suffixe
+    _f<n> garde son niveau n ; un nom nouveau recoit le prochain rang ;
+    un nom deja registre garde le sien. Deux termes canonises avec le
+    MEME fmap sont comparables etape par etape — les echanges de libres
+    (le defaut session 37) y sont detectes, la comparaison par simple
+    ordre d'apparition les manquait."""
     def rec(t, env):
         if isinstance(t, lb.Var):
             if t.name in env:
                 return ("var", env.index(t.name))
-            if t.name not in frees:
-                frees.append(t.name)
-            return ("var", len(env) + frees.index(t.name))
+            lvl = free_level(t.name, fmap.get(t.name, len(fmap)))
+            fmap.setdefault(t.name, lvl)
+            return ("var", len(env) + lvl)
         if isinstance(t, lb.Abs):
             return ("lam", rec(t.body, [t.param] + env))
         return ("app", rec(t.func, env), rec(t.arg, env))
 
     return rec(t, [])
+
+
+def to_debruijn(t):
+    """AST nominal -> arbre DB : ('lam', b) | ('app', f, a) | ('var', n).
+    Variables libres : index = hauteur courante + NIVEAU — le niveau =
+    le suffixe _f<n> du nom si present (l'identite stable), sinon le
+    rang de premiere occurrence (l'encodage initial, §2.11)."""
+    return to_debruijn_c(t, {})
 
 
 _FRESH = "xyzuvwrstab"

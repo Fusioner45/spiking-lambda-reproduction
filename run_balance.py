@@ -221,8 +221,6 @@ def main():
                 (name, eng, bd.to_debruijn(nf), bd.to_debruijn(exp_nf))
             print("    %-9s moteur %-2s : %2d etapes == oracle, forme"
                   " finale %s" % (name, eng, len(trace), lb.to_str(nf)))
-        print("    %-9s moteur %-2s : %2d etapes == oracle, forme"
-              " finale %s" % (name, eng, len(trace), lb.to_str(nf)))
 
     print()
     print("BALANCE POSITIONNELLE VALIDE — exacte la ou l'analogique"

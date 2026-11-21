@@ -23,10 +23,9 @@ l'ecriture (il sert de reference au differentiel).
 5. interruption/reprise en MATRICE (terme x point k x moteurs py/c) :
    les poids seuls, dynamique reinitialisee, terme relu == terme
    symbolique, continuation == reference ininterrompue — le cube est
-   l'etat (session 37). Cas FERMES verts partout ; cas OUVERT en xfail
-   strict : defaut de convention sur l'identite des libres (indices par
-   ordre d'apparition dans to_debruijn, _fN de from_debruijn ignores),
-   fix = session 38.
+   l'etat (session 37). Cas FERMES et OUVERTS verts partout (session
+   39 : le fix A-bis de l'identite des libres — to_debruijn honore les
+   suffixes _fN de from_debruijn).
 """
 
 import lambda_beta as lb
@@ -287,6 +286,9 @@ def main():
         # reference ininterrompue (les bancs de la continuation
         # ecraseraient cap) — la reprise part de l'etat de l'INTERRUPTION
         cap_snapshot = dict(cap)
+        # le terme de la boucle au point d'interruption (la cible de
+        # comparaison de la relecture — la continuation mute cur)
+        cur_int = cur
         # la reference ininterrompue jusqu'a la forme normale
         nf_ref = cur
         for _i in range(12):
@@ -315,13 +317,16 @@ def main():
             assert learned == [g * 8 + v for g, v in enumerate(pat)], \
                 ("capture non conforme au pattern", engine, s)
         read_resume = cube_r.read_all()
-        cur_ref = lb.parse(term_str)
-        for _i in range(k_int):
-            cur_ref, _d = lb.beta_step(cur_ref)
-        toks_ref = bd.to_tokens(bd.to_debruijn(cur_ref))
+        # la cible de comparaison = le terme PROPRE de la boucle de
+        # reference au point d'interruption (la convention stable :
+        # les libres nommes _fN par from_debruijn, honores par
+        # to_debruijn depuis le fix A-bis) — la marche symbolique pure
+        # (beta_step) re-classe les libres par apparition et n'est pas
+        # une cible coherente (chantier A-bis)
+        toks_ref = bd.to_tokens(bd.to_debruijn(cur_int))
         assert read_resume == toks_ref, \
-            ("terme relu != terme symbolique", engine, k_int,
-             read_resume, toks_ref)
+            ("terme relu != terme de la boucle de reference", engine,
+             k_int, read_resume, toks_ref)
         # continuation sur une boucle neuve du MEME moteur
         cur_resume = bd.from_debruijn(bd.tokens_to_db(read_resume))
         trace_resume = [len(read_resume)]
@@ -361,38 +366,19 @@ def main():
         n_res += 1
     _resume_case(t_233, 2, "c")
     n_res += 1
-    # terme ouvert : la matrice a DECOUVERT un defaut de convention
-    # (session 37) — l'identite des variables libres n'est pas stable
-    # d'une etape a l'autre : to_debruijn assigne les indices des libres
-    # par ordre d'apparition du prefixe et ignore les suffixes _fN poses
-    # par from_debruijn, donc des qu'une reduction change l'ordre
-    # relatif des libres (l'argument insere AVANT la variable gardée),
-    # les identites s'echangent. Le differentiel de production ne le
-    # voit pas : il compare rewrite -> tokens_to_db -> rows_fix avec
-    # lui-meme (auto-referentiel). XFAIL STRICT : le cas doit continuer
-    # d'echouer jusqu'au fix de convention ; s'il passe un jour, ce banc
-    # doit crier et le marqueur retire.
-    n_xfail = 0
+    # terme ouvert : le defaut de convention decouvert en session 37
+    # (l'identite des libres instable d'une etape a l'autre —
+    # to_debruijn re-classait les libres par ordre d'apparition en
+    # ignorant les suffixes _fN de from_debruijn) est CORRIGE en
+    # session 39 (A-bis) : les suffixes _fN sont honores, l'identite
+    # est stable. Les cas ouverts tournent comme les cas fermes.
     for eng in ("py", "c"):
-        failed = None
-        try:
-            _resume_case(t_open, 1, eng)
-        except AssertionError as exc:
-            failed = exc
-        assert failed is not None, \
-            ("XFAIL depasse : la reprise du terme ouvert PASSE — retirer"
-             " le marqueur, la convention libre est corrigee (session 37)")
-        print("    (terme ouvert, k=1, %s) : ECHEC ATTENDU (xfail strict)"
-              " — identite des libres non stable d'une etape a l'autre,"
-              " fix = session 38" % eng)
-        n_xfail += 1
-    print("    %d cas fermes (terme x point k x moteur) : le terme relu"
-          " egale le terme symbolique, la trace et la forme finale"
-          " egalent la reference ininterrompue — PARTOUT ; %d cas ouverts"
-          " en echec attendu (defaut de convention libre, documente)"
-          % (n_res, n_xfail))
-    print("    LE CUBE PORTE TOUT L'ETAT — la reprise depuis les poids")
-    print("    seuls reproduit la continuation a l'identique")
+        _resume_case(t_open, 1, eng)
+        n_res += 1
+    print("    %d cas (terme x point k x moteur, fermes ET ouverts) : le"
+          " terme relu egale le terme de la boucle de reference, la trace"
+          " et la forme finale egalent la reference ininterrompue —"
+          " PARTOUT" % n_res)
     print("    LE CUBE PORTE TOUT L'ETAT — la reprise depuis les poids")
     print("    seuls reproduit la continuation a l'identique")
 

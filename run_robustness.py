@@ -45,8 +45,13 @@ def check(name, s, expect_nf=None, max_steps=14):
     nf, trace, _ = LOOP.run(s, max_steps=max_steps)
     if expect_nf is not None:
         # comparaison STRUCTURELLE (De Bruijn) : le decodeur rebaptise
-        # les lieurs (x, y, ...), les noms ne sont pas significatifs
-        assert bd.to_debruijn(nf) == bd.to_debruijn(lb.parse(expect_nf)),             (name, lb.to_str(nf))
+        # les lieurs, les noms ne sont pas significatifs ; les LIBRES
+        # sont canonises par un registre semé depuis le TERME SOURCE
+        # (l'identite stable — le fix A-bis) : les echanges de libres
+        # y sont detectes
+        fmap = {}
+        bd.to_debruijn_c(lb.parse(s), fmap)
+        assert bd.to_debruijn_c(nf, fmap) ==             bd.to_debruijn_c(lb.parse(expect_nf), fmap),             (name, lb.to_str(nf))
     n = lb.church_to_int(nf)
     label = ("Church %d" % n) if n is not None else lb.to_str(nf)
     print("  %-26s %-2d etapes -> %s" % (name, len(trace) - 1, label))

@@ -148,6 +148,11 @@ class ClosedLoop:
         # les longs corps (finding n°8) — la limite finding n°8 disparait
         # aux parametres du papier (tau_m=300, pas de recalibration)
         self.balance_counter = balance_counter
+        # le registre nom -> niveau des libres (§2.11 : le meta possede
+        # le nommage initial) : la verification oracle compare les deux
+        # termes canonises avec le MEME registre — stable etape par
+        # etape, les echanges de libres y sont detectes
+        self.fmap = {}
         # mode production : sans comparaison oracle a chaque etape (la
         # correction du rewrite est deja etablie par la batterie ; ici on
         # mesure le cout de la boucle elle-meme). Arret = DET ne trouve
@@ -179,7 +184,7 @@ class ClosedLoop:
     def step(self, cur):
         """Une etape de reduction par les circuits reels. Renvoie
         (nouveau terme, rapport) ou (None, rapport) si forme normale."""
-        db = bd.to_debruijn(cur)
+        db = bd.to_debruijn_c(cur, self.fmap)
         toks = bd.to_tokens(db)
         rows = fv.rows_fix(db)
         rep = {"n_in": len(toks)}
@@ -308,7 +313,7 @@ class ClosedLoop:
             if not self.production:
                 # verification contre l'oracle a chaque etape
                 oracle, d = lb.beta_step(cur)
-                assert bd.to_debruijn(nxt) == bd.to_debruijn(oracle), rep
+                assert bd.to_debruijn_c(nxt, self.fmap) ==                     bd.to_debruijn_c(oracle, self.fmap), rep
             if self.verbose:
                 print("    etape : %s" % rep)
             steps.append(rep)
