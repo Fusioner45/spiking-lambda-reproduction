@@ -31,13 +31,13 @@ def main():
     loop = orc.ClosedLoop()
 
     # 1. (\x. x) I -> I
-    nf, trace, _ = loop.run("(%s) (%s)" % (eye, eye))
+    nf, trace, _ = loop.run("(%s) (%s)" % (eye, eye), max_steps=2)
     print("  (\\x. x) I : trace=%s -> %s"
           % (trace, lb.to_str(nf)))
     assert trace == [5, 2] and lb.to_str(nf) == "\\x. x"
 
     # 2. 2 I -> I : tranche la question ouverte n°1
-    nf, trace, _ = loop.run("(%s) (%s)" % (two, eye))
+    nf, trace, _ = loop.run("(%s) (%s)" % (two, eye), max_steps=4)
     print("  2 I       : trace=%s -> %s" % (trace, lb.to_str(nf)))
     print("              papier §3.1 : [10, 7, 5, 2] -> le 7 est une")
     print("              coquille, tranche par la boucle fermee (n°1)")
@@ -45,7 +45,8 @@ def main():
     assert lb.to_str(nf) == "\\x. x"
 
     # 3. plus 2 3 -> Church 5 (papier : 6 etapes)
-    nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three))
+    nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three),
+                        max_steps=7)
     print("  plus 2 3  : trace=%s -> Church %s (%d etapes ; papier : 6)"
           % (trace, lb.church_to_int(nf), len(trace) - 1))
     assert lb.church_to_int(nf) == 5

@@ -109,8 +109,10 @@ def main():
     check("lam x. (I x)", "\\x. (%s) x" % eye, "\\x. x")
 
     print("  [bloc 8] determinisme : deux runs de plus 2 3")
-    _, t1, _ = LOOP.run("(%s) (%s) (%s)" % (plus, two, three))
-    _, t2, _ = LOOP.run("(%s) (%s) (%s)" % (plus, two, three))
+    _, t1, _ = LOOP.run("(%s) (%s) (%s)" % (plus, two, three),
+                        max_steps=7)
+    _, t2, _ = LOOP.run("(%s) (%s) (%s)" % (plus, two, three),
+                        max_steps=7)
     assert t1 == t2
     print("    traces identiques : %s" % t1)
 
@@ -140,12 +142,14 @@ def main():
     # devient un test, plus une anecdote de journal
     print("  [bloc 10] enveloppe tau_m=300 (finding n°8) : 8+8 passe,")
     loop300 = orc.ClosedLoop(verbose=False, intg_tau_m=300.0)
-    nf, trace, _ = loop300.run("(%s) (%s) (%s)" % (plus, num(8), num(8)))
+    nf, trace, _ = loop300.run("(%s) (%s) (%s)" % (plus, num(8), num(8)),
+                           max_steps=12)
     assert lb.church_to_int(nf) == 16
     print("    plus 8  8 -> Church 16 (dans l'enveloppe) OK")
     loop300 = orc.ClosedLoop(verbose=False, intg_tau_m=300.0)
     try:
-        loop300.run("(%s) (%s) (%s)" % (plus, num(9), num(8)))
+        loop300.run("(%s) (%s) (%s)" % (plus, num(9), num(8)),
+                           max_steps=12)
         raise AssertionError("l'enveloppe tau_m=300 n'a pas tenu (9+8 passe "
                              "hors enveloppe : regression finding n°8)")
     except AssertionError as _e:

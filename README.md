@@ -241,7 +241,7 @@ weakenings.
 
 ## Status and limits
 
-The CI runs all 21 validation banks. The checked properties are
+The CI runs all 22 validation banks. The checked properties are
 deterministic simulation results against this repository's symbolic oracle;
 they are evidence for this implementation, not a formal proof or an
 independent biological validation. Known limits, documented in the note:

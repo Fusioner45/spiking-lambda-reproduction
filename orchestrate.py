@@ -34,6 +34,8 @@ Regles d'assemblage (le piege signale par Gemini, §2.10.3 shift_bind) :
   - jetons avant le redex et apres l'argument : inchangés.
 """
 
+import warnings
+
 import lambda_beta as lb
 import bridge_db as bd
 import free_vars_fix as fv
@@ -299,9 +301,16 @@ class ClosedLoop:
         nxt = bd.from_debruijn(bd.tokens_to_db(new_toks))
         return nxt, rep
 
-    def run(self, term_str, max_steps=8):
+    def run(self, term_str, max_steps):
+        """Boucle fermee. max_steps est OBLIGATOIRE (session 42 : un
+        defaut silencieux a produit un faux mur consigne — le halt du
+        mult 5 5 « a l'enveloppe DET », en fait la troncature du
+        harnais). Un halt PAR TRONCATURE (et non par forme normale) est
+        porte par rep["truncated"] sur la derniere etape et emis en
+        warning : un harnais ne coupe jamais un calcul sans le dire."""
         cur = lb.parse(term_str)
         trace, steps = [], []
+        truncated = True                      # le reste si break normal
         for _ in range(max_steps):
             trace.append(len(bd.to_tokens(bd.to_debruijn(cur))))
             nxt, rep = self.step(cur)
@@ -309,6 +318,7 @@ class ClosedLoop:
                 if not self.production:
                     oracle, d = lb.beta_step(cur)
                     assert d is False      # DET : forme normale == oracle
+                truncated = False          # halt par forme normale
                 break
             if not self.production:
                 # verification contre l'oracle a chaque etape
@@ -318,4 +328,11 @@ class ClosedLoop:
                 print("    etape : %s" % rep)
             steps.append(rep)
             cur = nxt
+        if truncated:
+            rep["truncated"] = True
+            warnings.warn("%s: run() hit max_steps=%d without a normal "
+                          "form -- the calculation was TRUNCATED by the "
+                          "harness, not finished (raise max_steps or fix "
+                          "the expected step count)" % (term_str[:40],
+                                                        max_steps))
         return cur, trace, steps

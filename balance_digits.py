@@ -16,7 +16,8 @@ valeur vit dans des phases, pas dans des potentiels ; l'erreur par
 fenetre est bornee par construction, la retenue la reporte exactement.
 
 Semantique : complement a deux base 8, k chiffres (k=3 couvre
-sigma dans [-128, 127] — la famille de stress plonge a -74). Le
+sigma dans [-256, 255] : b^k/2 = 256 ; la famille de stress plonge
+a -199). Le
 discharge (eq. 7) = sigma atteint +1 pour la premiere fois =
 (d0 == 1) et (tous les chiffres superieurs == 0) ; le latch ARG_MODE
 (§2.5.1) garde le premier feu.

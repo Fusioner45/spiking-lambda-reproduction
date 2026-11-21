@@ -31,8 +31,8 @@ the information lives in cyclic PHASES, not in decaying potentials. We
 apply the same idea to the balance counter:
 
 * **Digits.** The balance is held as signed base-8 digits (two's
-  complement, k digits; k = 3 covers sigma in [-128, 127], beyond the
-  deepest measured dive of -74). Each digit is a cyclic state with 8
+  complement, k digits; k = 3 covers sigma in [-256, 255], beyond the
+  deepest measured dive of -199). Each digit is a cyclic state with 8
   values, advanced by one step per VAR (+1) or APP (-1).
 * **Signed carries.** Crossing 7 -> 0 emits a +1 carry to the next
   digit; crossing 0 -> 7 emits a -1 carry. Carries propagate upward
@@ -135,8 +135,13 @@ reported a halt at the DET circuit's term span; that attribution was
 wrong: a direct probe shows the DET exact up to 1002-token terms, and
 the observed halt was the validation harness's own 8-step default.)
 
-## Open problems
-
-* Deeper dives: the k = 3 digits cover [-128, 127]; a wider range is
+* Deeper dives: the k = 3 digits cover [-256, 255]; a wider range is
   a digit-count change, but the carries cascade through the chain
   and their timing budget grows with it.
+* The circuit versus the spec beyond the digit range: the circuit is
+  a cyclic modulo-512 counter (the two's complement wraps through the
+  digits), and the measured profile shows it exact on a 599-token
+  body whose dive reaches -299 -- beyond the spec's [-256, 255]
+  window, whose hard guard stops earlier. The exact boundary of the
+  circuit (the dive must stay under half a counter revolution) is
+  measured informally; a formal profile at the boundary is open.

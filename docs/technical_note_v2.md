@@ -9,7 +9,7 @@ at bit-exact learned-weight equality; each bench states which components
 are compared.
 
 Repository: https://github.com/Fusioner45/spiking-lambda-reproduction
-(MIT, continuous integration, 21 validation benchmarks).
+(MIT, continuous integration, 22 validation benchmarks).
 
 To keep the scientific bookkeeping clean, the results below are sorted into
 three categories: **Reproduction** (behaviors matching the paper's

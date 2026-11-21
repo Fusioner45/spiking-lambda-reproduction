@@ -53,22 +53,23 @@ def main():
 
     # 1. batterie via le cube vivant (moteur C)
     loop = orc.ClosedLoop(living_cube=True, copy_engine="c", verbose=False)
-    nf, trace, _ = loop.run("(%s) (%s)" % (eye, eye))
+    nf, trace, _ = loop.run("(%s) (%s)" % (eye, eye), max_steps=2)
     print("  (\\x. x) I : trace=%s -> %s" % (trace, lb.to_str(nf)))
     assert trace == [5, 2] and lb.to_str(nf) == "\\x. x"
 
-    nf, trace, _ = loop.run("(%s) (%s)" % (two, eye))
+    nf, trace, _ = loop.run("(%s) (%s)" % (two, eye), max_steps=4)
     print("  2 I       : trace=%s -> %s" % (trace, lb.to_str(nf)))
     assert trace == [10, 8, 5, 2] and lb.to_str(nf) == "\\x. x"
 
-    nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three))
+    nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three),
+                        max_steps=7)
     print("  plus 2 3  : trace=%s -> Church %s"
           % (trace, lb.church_to_int(nf)))
     assert lb.church_to_int(nf) == 5
 
     # terme ouvert : les indices libres (canal reserve (7,7) + canaux
     # 5-6) sortent exactement — (\x. x y) z -> z y
-    nf, trace, _ = loop.run("(\\x. x y) z")
+    nf, trace, _ = loop.run("(\\x. x y) z", max_steps=2)
     print("  (\\x. x y) z : trace=%s -> %s" % (trace, lb.to_str(nf)))
     assert trace == [6, 3]
 
@@ -214,7 +215,8 @@ def main():
 
     # 3. differentiel moteur : Python == C
     loop = orc.ClosedLoop(living_cube=True, copy_engine="py", verbose=False)
-    _nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three))
+    _nf, trace, _ = loop.run("(%s) (%s) (%s)" % (plus, two, three),
+                        max_steps=7)
     print("  plus 2 3 (moteur Python) : trace=%s (identique)" % (trace,))
     assert trace == [31, 28, 25, 22, 19, 16, 13]
 
@@ -244,7 +246,7 @@ def main():
     try:
         loop = orc.ClosedLoop(living_cube=True, copy_engine="py",
                               verbose=False, bank_hook=_sabotage_hook)
-        loop.run("(%s) (%s)" % (two, eye))
+        loop.run("(%s) (%s)" % (two, eye), max_steps=4)
         raise AssertionError("corruption in-loop NON detectee")
     except ValueError:
         # except STRICT (revue externe) : avaler l'AssertionError du

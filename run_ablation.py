@@ -97,7 +97,7 @@ def main():
     # 0. PRECONDITION : la boucle non-ablatee reussit sur chaque famille
     for fam_name, term in FAMILIES:
         loop = orc.ClosedLoop(living_cube=True, verbose=False)
-        _nf, trace, _ = loop.run(term)
+        _nf, trace, _ = loop.run(term, max_steps=25)
         print("  precondition %-44s trace %s OK"
               % (fam_name, trace))
 
@@ -113,7 +113,7 @@ def main():
             verdict = "PASSEE EN SILENCE"
             try:
                 loop = orc.ClosedLoop(living_cube=True, verbose=False)
-                loop.run(term)
+                loop.run(term, max_steps=25)
             except AssertionError as e:
                 site_got = failure_site(e)
                 assert site in site_got, \
@@ -148,7 +148,7 @@ def main():
     ]
     for name, kwargs in configs:
         loop = orc.ClosedLoop(verbose=False, **kwargs)
-        _nf, trace, _ = loop.run(FAMILIES[0][1])
+        _nf, trace, _ = loop.run(FAMILIES[0][1], max_steps=25)
         assert trace == REF_TRACE, (name, trace, REF_TRACE)
         print("  %-42s trace %s" % (name, trace))
 
