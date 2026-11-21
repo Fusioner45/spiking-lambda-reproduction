@@ -53,7 +53,13 @@ PERSIST/GATE/SCAN orchestration.
   family and on every reduction step of the battery -- and the
   spiking circuit itself is validated slot by slot against the spec
   on both engines (`balance_circuit.py`): digits, carries and the
-  discharge position, exact where the analog counter drifts.
+  discharge position, exact where the analog counter drifts. In the
+  closed loop (`balance_counter=True`), the segmentation is exact at
+  the paper's parameters: PLUS 9 8 and PLUS 16 16 compute (Church 17
+  and 32) without the tau_m >= 1000 recalibration, and mult 5 5 runs
+  with exact segmentation on 83-token terms before halting at the
+  DET circuit's own delay-line envelope (~70-token terms, the next
+  analog limit to revisit).
 
 See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and

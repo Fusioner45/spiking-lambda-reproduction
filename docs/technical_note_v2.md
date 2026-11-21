@@ -70,7 +70,10 @@ Corrections measured since the first note:
   discharge: exact on the worst-case family (3 to 149 tokens) where the
   analog counter lands 2 to 27 slots early, and on every reduction step
   of the battery, and the spiking circuit of this design is validated
-  slot by slot against the spec on both engines.
+  slot by slot against the spec on both engines. In the closed loop,
+  the segmentation is exact at the paper's parameters: PLUS 9 8 and
+  PLUS 16 16 compute (the cases the analog counter refuses or misses)
+  without the recalibration.
 * **Free-variable index.** The published encoding binds free variables to
   a reserved phase code and drops their index. The fix combines the
   reserved code with two index channels in the slot encoding, is

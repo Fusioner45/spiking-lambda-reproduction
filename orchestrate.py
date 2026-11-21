@@ -43,6 +43,7 @@ import intg_body
 import bind_gamma
 import ring_phase
 import copy_stdp
+import balance_circuit
 import cube_state
 import cube_multiplex
 import cube_write
@@ -113,7 +114,7 @@ class ClosedLoop:
     def __init__(self, verify_copy=True, verbose=True, net_factory=None,
                  copy_engine="py", production=False, intg_tau_m=300.0,
                  living_cube=False, neural_keep=True, multiplexed=True,
-                 bank_hook=None):
+                 bank_hook=None, balance_counter=False):
         self.verify_copy = verify_copy
         self.verbose = verbose
         self.net_factory = net_factory
@@ -141,6 +142,12 @@ class ClosedLoop:
         # multiplexe (la chaine ne passe pas par write())
         self.bank_hook = bank_hook
         self.intg_tau_m = intg_tau_m
+        # chantier B : la segmentation par le COMPTEUR POSITIONNEL
+        # (balance_circuit.py — exact par construction) au lieu du
+        # compteur analogique (§2.5, tau_m) dont l'enveloppe derive sur
+        # les longs corps (finding n°8) — la limite finding n°8 disparait
+        # aux parametres du papier (tau_m=300, pas de recalibration)
+        self.balance_counter = balance_counter
         # mode production : sans comparaison oracle a chaque etape (la
         # correction du rewrite est deja etablie par la batterie ; ici on
         # mesure le cout de la boucle elle-meme). Arret = DET ne trouve
@@ -184,17 +191,27 @@ class ClosedLoop:
         assert K == K_or, rep
         if K == -1:
             return None, rep
-        # 2. INTG reel : corps puis argument (meme circuit relance)
-        r_body = intg_body.IntgCircuit(
-            toks, K, net_factory=self.net_factory,
-            tau_m=self.intg_tau_m).run()
-        l_body = r_body["pos"] + 1
+        # 2. INTG reel : corps puis argument (meme circuit relance) —
+        #    compteur POSITIONNEL (chantier B, exact) ou analogique
+        #    (§2.5, tau_m) selon le flag balance_counter
+        if self.balance_counter:
+            r_body = balance_circuit.BalanceCircuit(
+                toks, K, net_factory=self.net_factory).run()
+            l_body = r_body["pos"] + 1
+            r_arg = balance_circuit.BalanceCircuit(
+                toks, K + l_body, net_factory=self.net_factory).run()
+            l_arg = r_arg["pos"] + 1
+        else:
+            r_body = intg_body.IntgCircuit(
+                toks, K, net_factory=self.net_factory,
+                tau_m=self.intg_tau_m).run()
+            l_body = r_body["pos"] + 1
+            r_arg = intg_body.IntgCircuit(
+                toks, K + l_body, net_factory=self.net_factory,
+                tau_m=self.intg_tau_m).run()
+            l_arg = r_arg["pos"] + 1
         l_body_or = intg_body.body_end_pos(toks, K) + 1
         assert l_body == l_body_or, rep
-        r_arg = intg_body.IntgCircuit(
-            toks, K + l_body, net_factory=self.net_factory,
-            tau_m=self.intg_tau_m).run()
-        l_arg = r_arg["pos"] + 1
         l_arg_or = balance_end(toks, K + 2 + l_body)
         assert l_arg == l_arg_or, rep
         rep["l_body"], rep["l_arg"] = l_body, l_arg

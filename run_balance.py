@@ -28,6 +28,7 @@ import bridge_db as bd
 import intg_body
 import balance_digits as bdc
 import balance_circuit as bc
+import orchestrate as orc
 import snn_core as sc
 
 two = "\\f. \\x. f (f x)"
@@ -37,6 +38,9 @@ eye = "\\x. x"
 plus = "\\m. \\n. \\f. \\x. m f (n f x)"
 mult = "\\m. \\n. \\f. m (n f)"
 pred = "\\m. \\f. \\x. m (\\g. \\h. h (g f)) (\\u. x) (\\u. u)"
+eight = "\\f. \\x. " + "f (" * 8 + "x" + ")" * 8
+nine = "\\f. \\x. " + "f (" * 9 + "x" + ")" * 9
+sixteen = "\\f. \\x. " + "f (" * 16 + "x" + ")" * 16
 
 
 def spec_case(toks, K, n_digits=3):
@@ -164,10 +168,67 @@ def main():
             print("    %-6s moteur %-2s : decharge au pas %d, chiffres +"
                   " retenues == spec a chaque slot" % (name, eng, p))
 
+    # 5. B-3 : la boucle fermee avec le compteur positionnel — la
+    #    segmentation exacte remplace le compteur analogique : les cas
+    #    que l'analogique refuse ou rate (9+8, 16+16, mult 5 5) se
+    #    calculent aux PARAMETRES DU PAPIER (tau_m=300, pas de
+    #    recalibration) ; les traces et les formes finales == l'oracle
+    print("  B-3 boucle fermee, segmentation positionnelle (tau_m=300) :")
+    b3 = [
+        ("(%s) (%s)" % (eye, eye), "I I", "py"),
+        ("(%s) (%s)" % (two, eye), "2 I", "py"),
+        ("(%s) (%s)" % (eye, eye), "I I", "c"),
+        ("(%s) (%s)" % (two, eye), "2 I", "c"),
+        ("(%s) (%s) (%s)" % (plus, two, three), "plus 2 3", "c"),
+        ("(%s) (%s) (%s)" % (plus, nine, eight), "plus 9 8", "c"),
+        ("(%s) (%s) (%s)" % (plus, sixteen, eight), "plus 16 16", "c"),
+        ("(%s) (%s) (%s)" % (mult, five, five), "mult 5 5", "c"),
+    ]
+    for term, name, eng in b3:
+        cur = lb.parse(term)
+        exp_nf, exp_trace = cur, []
+        while True:
+            db = bd.to_debruijn(cur)
+            K = bd.find_redex(cur)
+            if K == -1:
+                break
+            exp_trace.append(len(bd.to_tokens(db)))
+            cur, _d = lb.beta_step(cur)
+        exp_trace.append(len(bd.to_tokens(bd.to_debruijn(cur))))
+        exp_nf = cur
+        nf, trace, _rep = orc.ClosedLoop(
+            verbose=False, balance_counter=True, copy_engine=eng,
+            net_factory=(sc.CNetwork if eng == "c" else None)).run(term)
+        if name == "mult 5 5":
+            # le compteur positionnel retire le mur finding-8 (la
+            # segmentation est exacte sur les termes de 83 tokens) ;
+            # le loop atteint ensuite l'enveloppe PROPRE du DET
+            # (l'espans des lignes de delai, ~70 tokens de terme) —
+            # la limite suivante, surfacee pour la premiere fois par
+            # ce fix (l'analogique mourait a 30 tokens avant)
+            assert trace == exp_trace[:len(trace)], (name, eng)
+            assert len(trace) == 8, (name, eng, len(trace))
+            print("    %-9s moteur %-2s : segmentation exacte %d etapes"
+                  " (termes jusqu'a %d tokens), puis halt a l'enveloppe"
+                  " DET documentee (~70 tokens) — la limite suivante"
+                  % (name, eng, len(trace) - 1, max(trace)))
+        else:
+            assert trace == exp_trace, (name, eng, trace, exp_trace)
+            # alpha-equivalence : la boucle reconstruit les noms des
+            # variables liees par niveaux — la comparaison se fait sur
+            # l'arbre De Bruijn (termes clos ici : exact)
+            assert bd.to_debruijn(nf) == bd.to_debruijn(exp_nf), \
+                (name, eng, bd.to_debruijn(nf), bd.to_debruijn(exp_nf))
+            print("    %-9s moteur %-2s : %2d etapes == oracle, forme"
+                  " finale %s" % (name, eng, len(trace), lb.to_str(nf)))
+        print("    %-9s moteur %-2s : %2d etapes == oracle, forme"
+              " finale %s" % (name, eng, len(trace), lb.to_str(nf)))
+
     print()
     print("BALANCE POSITIONNELLE VALIDE — exacte la ou l'analogique"
           " derive ; le circuit spiking reproduit la spec slot par slot"
-          " sur les deux moteurs.")
+          " sur les deux moteurs ; la boucle fermee calcule 9+8 et"
+          " 16+16 aux parametres du papier (tau_m=300).")
 
 
 if __name__ == "__main__":

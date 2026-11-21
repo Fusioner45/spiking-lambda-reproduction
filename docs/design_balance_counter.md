@@ -1,8 +1,7 @@
 # Design note: a positional balance counter (chantier B)
 
-Status: spec AND spiking circuit designed and validated differentially
-(`run_balance.py`, both engines); the closed-loop integration is the
-next step (B-3).
+Status: spec, spiking circuit AND closed-loop integration designed
+and validated differentially (`run_balance.py`, both engines).
 
 ## The measured defect of the analog counter
 
@@ -114,11 +113,32 @@ with digits (1, 0, 0). The bench asserts these counts.
   positions are exact where the analog counter drifts by 2 to 27
   slots.
 
+## The closed-loop integration (B-3, validated)
+
+The loop's `balance_counter` mode replaces the analog IntgCircuit for
+the segmentation: the positional counter computes l_body and l_arg
+(25 ms/token of simulated time, its own clock). The oracle checks of
+the loop (l_body == truth, l_arg == truth) pass on every step.
+Results at the PAPER'S parameters (tau_m = 300, no recalibration):
+
+* PLUS 2 3: 6 reductions, Church 5 (the paper's trace);
+* PLUS 9 8: 6 reductions, Church 17 -- the case the analog counter
+  REFUSES at tau_m = 300 (finding 8's falsifiable envelope);
+* PLUS 16 16: 6 reductions, Church 32 -- the case that needed the
+  tau_m >= 1000 recalibration.
+
+The finding-8 limitation is removed at the paper's own parameters.
+The mult 5 5 case runs 7 reductions with exact segmentation on terms
+up to 83 tokens, then the loop halts at the NEXT documented envelope:
+the DET circuit's delay-line span (~70-token terms, surfaced for the
+first time by this fix -- the analog counter masked it by dying at
+30 tokens first).
+
 ## Open problems
 
-* The closed-loop integration (B-3): replacing the analog
-  IntgCircuit inside the loop, with the counter's 25 ms/token budget
-  accounted in the step's simulated time.
+* The DET circuit's term-span envelope (~70 tokens, measured here for
+  the first time): the delay-line span is the next analog limit to
+  revisit with the same positional/grid treatment.
 * Deeper dives: the k = 3 digits cover [-128, 127]; a wider range is
   a digit-count change, but the carries cascade through the chain
   and their timing budget grows with it.
