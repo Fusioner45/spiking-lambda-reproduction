@@ -77,9 +77,12 @@ def bound_mask_papier(rows, lam_self):
 
 def truth_bound(rows, d_lam):
     """Verite semantique : VAR non libres dont le binder est a la
-    profondeur d_lam (= le lambda du redex). Independant de l'encodage."""
+    profondeur d_lam (= le lambda du redex), a l'adresse COMPLETE
+    (fine + coarse) : la fine seule matchait les lieurs a profondeur
+    d_lam + 8k. Independant du circuit."""
     return [i for i, (tid, d, sf, sc, bf, bc, libre) in enumerate(rows)
-            if tid >= 4 and not libre and bf == d_lam]
+            if tid >= 4 and not libre
+            and bf == d_lam % bd.K_F and bc == d_lam // bd.K_C]
 
 
 def noise_false_positive_rate(rows, lam_self, p=0.1, trials=4000, seed=1):

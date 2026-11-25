@@ -78,6 +78,11 @@ def from_debruijn(t):
     def rec(t, env):
         if t[0] == "var":
             n = t[1]
+            if n < 0:
+                # un indice negatif n'est jamais une adresse : env[-1]
+                # enroulait SILENCIEUSEMENT sur le lieur le plus externe
+                # (capture muette, defaut de convention de la session 44)
+                raise ValueError("indice de Bruijn negatif : %r" % (n,))
             if n < len(env):
                 return lb.Var(env[n])
             # nom deduit du NIVEAU (n - len(env), invariant par

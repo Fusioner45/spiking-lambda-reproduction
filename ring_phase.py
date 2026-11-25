@@ -23,6 +23,7 @@ Cas limites (releves par Gemini, traites ici) :
 import lambda_beta as lb
 import bridge_db as bd
 import free_vars_fix as fv
+import intg_body
 import snn_engine as se
 
 DT = 0.1
@@ -83,17 +84,25 @@ class PhaseRing:
 
 def substitutions_of_step(t):
     """Pour chaque etape de reduction : (K, d_lam, d_ref, liste des
-    (position, d_var, sh) des VAR lies au lambda du redex)."""
+    (position, d_var, sh) des VAR lies au lambda du redex) — les VAR du
+    CORPS, a l'adresse COMPLETE du lieur (fine + coarse). La fine seule,
+    sur tout le terme, matchait aussi les VAR lies a un AUTRE lambda de
+    meme fine (freres, argument, suffixe) : 53 des 99 « substitutions »
+    que comptait run_ring n'etaient pas liees au redex (46 reelles ; la
+    conclusion sh >= 0 tenait quand meme : ces VAR sont aussi a
+    profondeur >= lieur + 1)."""
     toks = bd.to_tokens(bd.to_debruijn(t))
     k = bd.find_redex(t)
     if k == -1:
         return None
     d_lam = toks[k + 1][1]
     d_ref = toks[k][1]                     # racine de l'argument = l'APP
+    body_end = k + 2 + intg_body.body_end_pos(toks, k) + 1
     rows = fv.rows_fix(bd.to_debruijn(t))
     subs = []
     for j, r in enumerate(rows):
-        if j > k + 1 and r[0] >= 4 and not r[6] and r[4] == d_lam:
+        if (k + 1 < j < body_end and r[0] >= 4 and not r[6]
+                and r[4] == d_lam % bd.K_F and r[5] == d_lam // bd.K_C):
             d_var = toks[j][1]
             subs.append((j, d_var, d_var - 1 - d_ref))
     return k, d_lam, d_ref, subs

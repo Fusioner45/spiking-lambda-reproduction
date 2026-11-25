@@ -28,6 +28,7 @@ import bridge_db as bd
 import det_redex as dr
 import intg_body as ig
 import balance_circuit as bcc
+import snn_core as scn
 
 
 def numeral(k):
@@ -65,6 +66,15 @@ def prof_positional():
         except AssertionError as exc:
             if first_err is None:
                 first_err = (2 * n_x - 1, str(exc)[:70])
+            continue
+        if n_x == 300:
+            # le moteur C sur le plus grand corps (audit session 44) : son
+            # horizon alloue (100000 pas = 10 s) tronquait ces 150800 pas
+            # en SILENCE et renvoyait pos = None
+            r_c = bcc.BalanceCircuit(toks, -1,
+                                     net_factory=scn.CNetwork).run()
+            assert r_c["pos"] == r["pos"] and r_c["digits"] == r["digits"], \
+                ("moteur C != Python", n_x, r_c["pos"], r["pos"])
     return last_ok, first_err
 
 
@@ -131,6 +141,9 @@ def main():
     print("  une limite DOCUMENTEE avec garde dure — l'overflow mesure en est")
     print("  la borne, pas un echec ; le profil guide la v2 (quels circuits")
     print("  convertir au traitement positionnel pour le scaling).")
+    print("  Le compteur positionnel est aussi verifie sur le moteur C au")
+    print("  plus grand corps (l'horizon alloue du coeur C le tronquait")
+    print("  en silence avant l'audit de la session 44).")
     assert rows[0][1][0] >= 1000
     print()
     print("PROFIL VALIDE — la carte des limites reelles remplace les")

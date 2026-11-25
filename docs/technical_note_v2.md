@@ -9,7 +9,7 @@ at bit-exact learned-weight equality; each bench states which components
 are compared.
 
 Repository: https://github.com/Fusioner45/spiking-lambda-reproduction
-(MIT, continuous integration, 22 validation benchmarks).
+(MIT, continuous integration, 23 validation benchmarks).
 
 To keep the scientific bookkeeping clean, the results below are sorted into
 three categories: **Reproduction** (behaviors matching the paper's
@@ -135,6 +135,54 @@ indices depend on binders outside the scanned body, the index update
 remains meta-controlled (the scan cannot see binders above the body), so
 the neural path is complete on closed terms and hybrid exactly there.
 
+**Church lists in the closed loop (`run_lists.py`).** The battery's
+terms are numerals and combinator families. Lists add nested binders:
+with `nil = \c n. n` and `cons h t = \h t c n. c h (t c n)` written in
+line, each cons carries four binders and each numeral two, so kept
+bodies reach binders at depth 7 and beyond. The closed loop with
+positional segmentation reduces `append [1,2] [3]` (87 tokens) in 18
+reductions to a normal form that reads back as [1,2,3], `append [1,2,3]
+[4]` (113 tokens) in 22 reductions to [1,2,3,4], `map succ [1,2]`
+(82 tokens) in 26 reductions to [2,3] (its normal form keeps two
+vacuous binders in head position, ignored at readout), and `reverse
+[1,2,3]` (90 tokens) in 27 reductions to [3,2,1]. The trace and
+the normal form equal the symbolic oracle at every step on both
+engines, and the same reductions run with the living cube: slot
+patterns composed with the channel-level KEEP reference, written by
+the multiplexed chain, read back from the memories. This is symbolic
+calculation on structured terms, of the same nature as the numeral
+battery.
+
+The terms exposed a convention defect of this implementation, recorded
+here as such. The topographic assembly applies the KEEP decrement to
+each kept body variable by comparing the binder's address with the
+redex lambda's depth, and our comparison used the binder's fine phase
+alone. A variable bound inside the body by a binder at depth 7 mod 8
+was decremented as if it were free, and a binder at depth 8 or more
+was decremented as if it sat above the redex. The name reconstruction
+then read the resulting index of -1 as the outermost binder without
+complaint; the loop's oracle check stopped the reduction at the fifth
+step of `append [1,2] [3]`, so no wrong normal form was produced. The
+defect was first observed on the same append written with the cons
+already applied (`cons h t = \c n. c h (t c n)`, 69 tokens, 12
+reductions), where the old rule is wrong from the second reduction:
+two kept variables lose one index each (index 1 read as 0) because
+their binder sits at address 7, whose fine phase is the reserved code
+of free variables. The redex lambda is at depth 0 at that step, so
+only this first case is exercised there. At that step the
+channel-level composition equals the oracle's re-encoding on all 63
+slots and the neural re-scan refuses the body: the symbolic assembly
+was the only faulty component, and the bank pins this diagnosis. The
+comparison now uses the full binder address and the free flag, the
+reconstruction refuses negative indices, and the bank pins both cases
+with minimal terms and lists which demos trigger them. The repository
+holds three definitions of the binding truth (closed loop, phase-ring
+bank, free-variable bank); they agree at every reduction of the demos.
+The analog counter refuses the 87-token term at its
+first step at tau_m = 300 ms (a 45-token argument) and at its second
+step at tau_m = 1000 ms (a 55-token body): the finding-8 envelope,
+measured here on a list.
+
 ## 3. Neural rescan and ordinal BIND bus (Extension)
 
 The KEEP decrement of Section 2.10.3 is realized by a neural rescan: one
@@ -182,6 +230,29 @@ never have observed this; the discovery came from scaling the depth, not
 from a content differential. We record it as an addressing constraint:
 the flat address plan shared between the global buses and the
 depth-indexed level channels must be partitioned.
+
+**Envelope on structured bodies (measured, `run_lists.py`).** The
+reads above are validated on the battery's terms, whose bodies are
+short and hold few binders. On the body of the fifth reduction of
+`append [1,2] [3]` (38 tokens, 11 binders) the neural re-scan leaves
+its envelope in two independent ways. With the nominal 12 ms slot the
+ordinal wave is late: the response of the lowest binder lands in the
+next slot, the ordinal of one read is shifted, and the circuit raises
+on the following slot (its out-of-wave firing assertion), so the result
+is refused rather than wrong. Independently of the wave, the analog
+INTG stack closes the outer levels one token early: the depth read for
+the last body token is d_lam instead of d_lam + 1, with the wave
+disabled and at both tested slot lengths (12 and 24.8 ms). This is the
+finding-8 drift acting on the rescan stack; scaling tau_m with the slot
+does not restore exactness (the same last-token error remains at
+tau_m = 2067 ms with a 24.8 ms slot). Sizing the slot to the wave
+budget (24.8 ms) clears the first wall only. The 43-token body of the
+second reduction of the same append in the two-binder encoding is
+refused at the nominal slot as well. The list demos therefore
+compose the cube on the channel-level KEEP reference; a positional
+counter per level, built from the Section 2.7 mechanics validated in
+the positional balance counter, is the natural candidate for the second
+wall and is not implemented.
 
 ## 4. Temporal multiplexing (Extension, an alternative to Section 2.10.2)
 
@@ -326,6 +397,11 @@ per-seed rate at about 3 percent, and 0/300 bounds it at about
   exact at 15 tokens and wrong at 39, so L_max lies between those
   measured points on this shape); a shape-aware or recurrent fix is
   open.
+* The neural re-scan on structured bodies: on a 38-token body with 11
+  binders the ordinal wave exceeds the nominal slot and the analog INTG
+  stack closes the outer levels one token early, at both tested slot
+  lengths. Both are detected. The list demos compose the cube on the
+  channel-level KEEP reference; a positional counter per level is open.
 * The noise mitigation statistics (a 40-trial majority sweep, plus
   3 seeds x 100 trials = 300 trials on the critical term) are
   intermediate; a 1000-trial multi-seed study is future work.
@@ -338,7 +414,12 @@ the STDP copy, the living working-memory cube as the effective state
 carrier, the neural rescan with an ordinal BIND bus, and a shared-chain
 multiplexed write with a neural gate, each validated differentially at
 bit-exact equality against a symbolic reference, with the cost trade-offs
-measured in three cost categories. The limits are documented rather than
+measured in three cost categories. Church lists (append, map, reverse)
+are reduced in the closed
+loop with positional segmentation and with the living cube on the KEEP
+reference; the convention defect they exposed in the assembly is
+recorded and pinned, with its diagnosis measured on the term of the
+first observation. The limits are documented rather than
 hidden, and the experiments that contradicted our own assumptions (the
 falsifiable envelope, the concurrency verdict, the Section 2.10.2
 attribution correction) are kept in the record.

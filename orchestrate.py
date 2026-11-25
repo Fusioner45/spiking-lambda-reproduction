@@ -51,8 +51,6 @@ import cube_multiplex
 import cube_write
 import snn_core
 
-RESERVED_FINE = 7                  # code (7,7) des libres (notre fix)
-
 
 def balance_end(tokens, start):
     """Longueur du sous-terme qui debute a `start` (premier +1 de sigma,
@@ -88,13 +86,22 @@ def rewrite(tokens, rows, K, l_body, l_arg, bound_sh):
         else:
             tid, d = tokens[j]
             if tid >= 4:
-                bf = rows[j][4]
+                # l'adresse COMPLETE du lieur (fine + 8 x coarse, §2.6)
+                # et le drapeau libre : comparer la fine seule (defaut
+                # d'origine, session 44) decrementait par accident un VAR
+                # dont le lieur est a profondeur >= 8 (fine < d_lam) ou a
+                # profondeur 7 mod 8 (fine == code libre) : indice -1,
+                # capture silencieuse du lieur externe par from_debruijn
+                _sf, _sc, bf, bc, libre = rows[j][2:]
+                b = bf + 8 * bc
+                assert b != d_lam, ("VAR lie au redex hors du masque", j)
                 # -1 si le lambda du redex etait dans le chemin vers le
-                # lieur (bf < d_lam) ou si la variable est libre (bf=7) ;
-                # inchange si le lieur est plus profond (bf > d_lam).
+                # lieur (b < d_lam) ou si la variable est libre ;
+                # inchange si le lieur est plus profond (b > d_lam).
                 n = tid - 4
-                if bf < d_lam or bf == RESERVED_FINE:
+                if libre or b < d_lam:
                     n -= 1
+                assert n >= 0, ("indice negatif", j, tid, d, b, d_lam)
                 out.append((bd.VAR(n), d - 1))
             else:
                 out.append((tid, d - 1))
@@ -323,7 +330,8 @@ class ClosedLoop:
             if not self.production:
                 # verification contre l'oracle a chaque etape
                 oracle, d = lb.beta_step(cur)
-                assert bd.to_debruijn_c(nxt, self.fmap) ==                     bd.to_debruijn_c(oracle, self.fmap), rep
+                assert (bd.to_debruijn_c(nxt, self.fmap)
+                        == bd.to_debruijn_c(oracle, self.fmap)), rep
             if self.verbose:
                 print("    etape : %s" % rep)
             steps.append(rep)

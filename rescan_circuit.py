@@ -159,6 +159,10 @@ class RescanStack:
         self.all = []                        # tous les niveaux crees
         self.slot = 0
         self.last_closures = 0               # nb de fermetures du dernier slot
+        # tete de chaine definie dans TOUS les cas : avec binder_bus=False
+        # elle manquait et feed() levait AttributeError au premier VAR
+        self.last_lam_pos = None             # tete de la chaine de lieurs
+        self.last_lam_pos_pq = None          # son port d'injection d'onde
         if binder_bus:
             self.w_pg, v_min_inf = calibrate_w_pg()   # asymptotique (500 ms)
             # le saut d'onde = 0.78 : un GATE non arme (V=0) atteint 0.78
@@ -175,8 +179,7 @@ class RescanStack:
             # poids calcule (+38 = surcharge -> les GATE des lieurs
             # fermes restent a V~0.85 et tirent spontanement)
             self.w_halt_gate = -1.30 / se.measure_epsilon(30.0, 1.0, dt)
-            self.last_lam_pos = None         # tete de la chaine de lieurs
-            self.last_lam_pos_pq = None      # son port d'injection d'onde
+
         self._push("BODY")                   # le corps lui-meme
 
     def _add_intg(self):

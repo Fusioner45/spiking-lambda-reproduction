@@ -175,23 +175,24 @@ class BalanceCircuit:
         digits_by_slot = [[None] * self.n_digits for _ in range(n_slots)]
         carries_by_slot = [[] for _ in range(n_slots)]
         cmp_slot = None
-        for _i in range(n_steps):
-            fired = self.net.step()
-            t = self.net.k_step * self.dt
+        # UN appel bulk (les deux moteurs ont la meme convention de temps,
+        # (pas+1)*dt) : le pas-a-pas via ctypes coutait un appel par pas de
+        # 0.1 ms — 5 min pour append sur le moteur C, 12 s en Python
+        # (session 44) ; les evenements et leur ordre sont identiques
+        for t, idx in self.net.bulk_run(n_steps):
             slot = int(t // self.slot_ms)
             if slot >= n_slots:
                 continue
-            for idx in fired:
-                if idx == self.cmp:
-                    if cmp_slot is None:
-                        cmp_slot = slot
-                elif idx in P_of:
-                    d, k = P_of[idx]
-                    digits_by_slot[slot][d] = k
-                elif idx in TP_wrap:
-                    carries_by_slot[slot].append(TP_wrap[idx])
-                elif idx in TM_wrap:
-                    carries_by_slot[slot].append(TM_wrap[idx])
+            if idx == self.cmp:
+                if cmp_slot is None:
+                    cmp_slot = slot
+            elif idx in P_of:
+                d, k = P_of[idx]
+                digits_by_slot[slot][d] = k
+            elif idx in TP_wrap:
+                carries_by_slot[slot].append(TP_wrap[idx])
+            elif idx in TM_wrap:
+                carries_by_slot[slot].append(TM_wrap[idx])
         # correction du warm-up : les slots de spec commenceraient au
         # slot WARMUP_SLOTS du reseau
         spec_digits = digits_by_slot[WARMUP_SLOTS:]

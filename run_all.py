@@ -18,6 +18,7 @@ BANKS = (
     "run_snn_core", "run_robustness", "run_noise", "run_envelope",
     "run_scale", "run_cube", "run_rescan", "run_multiplex",
     "run_ablation", "run_stress", "run_balance", "run_envelope_profile",
+    "run_lists",
 )
 
 

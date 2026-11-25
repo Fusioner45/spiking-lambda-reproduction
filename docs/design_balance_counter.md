@@ -145,3 +145,20 @@ the observed halt was the validation harness's own 8-step default.)
   window, whose hard guard stops earlier. The exact boundary of the
   circuit (the dive must stay under half a counter revolution) is
   measured informally; a formal profile at the boundary is open.
+
+## Implementation note (session 44)
+
+The circuit's run loop drives the network with a single bulk call on
+both engines. It used to step the network one `dt` at a time, and on
+the C engine each step went through ctypes and rebuilt the whole spike
+log (the wrapper's `step` read the log from index 0 and sliced it), a
+quadratic cost in the number of spikes. The outputs are unchanged:
+position, digits per slot and carries per slot are identical before
+and after on six cases and both engines, and the B-2 and B-3 blocks
+of `run_balance.py` keep their differential. The effect is on
+wall-clock only, which is not a simulated-time metric: on the
+development machine the closed loop with this counter reduces
+`append [1,2] [3]` (18 reductions) in 0.40 s on the C engine, where
+the step-by-step loop took 5 min 05 s (the Python engine takes about
+12 s on the same term). The C wrapper's `bulk_run` also returns only
+the spikes of its own run now, as the Python engine does.

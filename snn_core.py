@@ -77,8 +77,16 @@ class CNetwork:
         return _LIB.snn_add_neuron(self.h, tau_m, t_ref)
 
     def connect(self, src, dst, w, delay_ms, tau_syn):
-        return _LIB.snn_connect(self.h, src, dst, w,
-                                int(round(delay_ms / self.dt)), int(tau_syn))
+        r = _LIB.snn_connect(self.h, src, dst, w,
+                             int(round(delay_ms / self.dt)), int(tau_syn))
+        if r < 0:
+            # avant : -1 etait IGNORE — la synapse d'un port source hors
+            # plage etait creee et ne se declenchait jamais, en silence
+            raise ValueError(
+                "snn_connect refuse (src=%r dst=%r w=%r delay_ms=%r "
+                "tau_syn=%r) : dst doit etre un neurone existant, le delai "
+                "positif, tau_syn > 0" % (src, dst, w, delay_ms, tau_syn))
+        return r
 
     def inject(self, src, t_ms):
         _LIB.snn_inject(self.h, src, int(round(t_ms / self.dt)))
@@ -91,10 +99,13 @@ class CNetwork:
 
     def step(self):
         """Un pas de simulation ; renvoie la liste des idx qui spikent
-        (semantique de snn_engine.Network.step)."""
+        (semantique de snn_engine.Network.step). Seuls les spikes NOUVEAUX
+        sont lus (avant : tout le journal etait reconstruit a chaque pas,
+        cout quadratique — le compteur positionnel pas a pas mettait
+        5 min au lieu de quelques secondes, session 44)."""
         before = _LIB.snn_n_spikes(self.h)
         _LIB.snn_run(self.h, 1)
-        return [idx for (_t, idx) in self.spikes()[before:]]
+        return [idx for (_t, idx) in self.spikes_since(before)]
 
     def alloc_I(self):
         _LIB.snn_alloc_I(self.h)
@@ -106,18 +117,26 @@ class CNetwork:
         _LIB.snn_reset(self.h)
 
     def bulk_run(self, n_steps):
-        """n pas en UN appel ctypes ; renvoie [(temps_ms, idx), ...]
-        (convention (pas+1)*dt, alignee sur snn_engine.bulk_run)."""
+        """n pas en UN appel ctypes ; renvoie [(temps_ms, idx), ...] des
+        spikes de CE run (convention (pas+1)*dt, alignee sur
+        snn_engine.bulk_run : les spikes des appels precedents ne sont
+        pas re-emis)."""
+        before = _LIB.snn_n_spikes(self.h)
         _LIB.snn_run(self.h, n_steps)
-        return self.spikes()
+        return self.spikes_since(before)
 
     def spikes(self):
-        """[(temps_ms, idx), ...] — convention Python : k_step APRES
-        increment (=(pas+1)*dt), pour l'egalite spike-a-spike."""
-        out = []
+        """[(temps_ms, idx), ...] — TOUT le journal, convention Python :
+        k_step APRES increment (=(pas+1)*dt), pour l'egalite
+        spike-a-spike."""
+        return self.spikes_since(0)
+
+    def spikes_since(self, i0):
+        """Les spikes du journal a partir de l'indice i0."""
         n = _LIB.snn_n_spikes(self.h)
+        out = []
         st, idx = ctypes.c_int(), ctypes.c_int()
-        for i in range(n):
+        for i in range(i0, n):
             _LIB.snn_spike(self.h, i, ctypes.byref(st), ctypes.byref(idx))
             out.append(((st.value + 1) * self.dt, idx.value))
         return out

@@ -246,3 +246,72 @@ mechanism is Section 2.10.2 (one pos_arg chain PER bound occurrence,
 staggered delays); Section 4.5 is Future directions (System F). The
 multiplexing implemented here is an alternative architecture
 addressing the per-occurrence cost of the Section 2.10.2 scheme.
+
+## 6. Envelope on structured bodies (session 44, measured)
+
+The reads above are validated on the battery's terms. Church lists
+(`run_lists.py`) bring bodies with many nested binders: a cons carries
+four, each numeral two. On the body of the fifth reduction of
+`append [1,2] [3]` (38 tokens, 11 binder levels created along the
+scan) the re-scan leaves its envelope in two independent ways. Both
+are detected: neither produces a silently wrong cube, because the
+verified path compares the composed patterns with the re-encoding at
+every step.
+
+1. Wave budget (nominal slot). The chain counts every binder level
+   ever created, closed ones included (they relay the wave without
+   answering). At the read of the 20th body token the chain holds 7
+   levels and the response of the lowest binder lands 1.3 ms inside
+   the NEXT slot. The strict counting window attributes it to that
+   next read: the ordinal shifts and the binder read is depth 4 where
+   the reference says 3. The circuit then raises on the following
+   slot, which carries no wave (its out-of-wave firing assertion).
+   This is the stress-bank envelope (about 1.8 ms per stage) reached
+   by a real term. The hazard is worth stating: had the following slot
+   carried a wave, the late response would have been counted in the
+   wrong ordinal and the circuit alone would not have said so; only
+   the differential with the re-encoding catches it.
+2. INTG drift (both tested slot lengths). With the wave disabled
+   (`binder_bus=False`) and the nominal slot, the depth read for the
+   last body token is d_lam (2) instead of d_lam + 1 (3): the outer
+   levels, BODY included, close one token early. The same error is
+   measured at a 24.8 ms slot and with tau_m scaled with the slot
+   (2067 ms). This is the finding-8 drift reaching the stack; its
+   mechanism is the one the stress bank measures on the stand-alone
+   counter and was not re-measured here. Scaling tau_m with the slot
+   does not restore exactness: at tau_m = 2067 ms the closure pattern
+   changes (one level closes at token 35 where four close at
+   tau_m = 1000 ms) and the last-token error remains. A single pulse
+   is normalized to exactly the threshold (W_CNT = 1 / epsilon), so
+   any change of tau_m moves the single-pulse levels onto the knife
+   edge; which levels close late at tau_m = 2067 ms was not isolated.
+3. Slot sized to the wave budget. The stress-bank rule (3.8 +
+   1.8 (n_lam - 1) + 3 ms, so 24.8 ms here) clears the first wall:
+   every binder read of the body is then exact. The second wall
+   stays: exactly one of the 72 slots differs from the reference, the
+   last body token.
+
+The figures of items 1 to 3 (7 levels on the chain at the 20th token,
+the late response 1.3 ms inside the next slot, the read of depth 4
+for 3, the closure counts at token 35 for both tau_m values) are
+asserted by `run_lists.py` (blocks 6 and 6d).
+
+The body of the second reduction of the same append in the two-binder
+encoding (43 tokens; the term on which the assembly defect of
+`technical_note_v2.md` Section 2 was first observed) is refused at the
+nominal slot too, with the same out-of-wave firing assertion
+(`run_lists.py`, block 2b). Which of the two walls it meets first was
+not isolated.
+
+Status: the list demos run the living cube on the channel-level KEEP
+reference (`neural_keep=False`), which is exact on these bodies (72 of
+72 slots equal the oracle re-encoding on the body above). Candidate
+for the second wall: a positional counter per level (the mechanics of
+`balance_circuit.py`, exact by construction). Candidate for the first:
+the slot sized by the binder count, once the second wall is cleared.
+Neither is implemented.
+
+Repair along the way: `RescanStack(binder_bus=False)` raised an
+`AttributeError` on its first VAR (the chain head was only created
+with the bus); the head is now defined in every mode, and block 6 of
+`run_lists.py` exercises the bus-less stack.

@@ -59,6 +59,34 @@ PERSIST/GATE/SCAN orchestration.
   and 32) without the tau_m >= 1000 recalibration, and mult 5 5 runs
   to completion (13 reductions to Church 25) with exact segmentation
   on 83-token terms.
+* Structured data: Church lists (`run_lists.py`). With
+  `nil = \c n. n` and `cons h t = \h t c n. c h (t c n)` inlined, the
+  closed loop reduces `append [1,2] [3]` (87 tokens) in 18 reductions
+  and the normal form reads back as the list [1,2,3]; `append [1,2,3]
+  [4]` (113 tokens, 22 reductions) gives [1,2,3,4], `map succ [1,2]`
+  (82 tokens, 26 reductions) gives [2,3] and `reverse [1,2,3]` (90
+  tokens, 27 reductions) gives [3,2,1]. Traces and normal forms equal
+  the symbolic oracle at every step, with positional segmentation, on
+  both engines. With the living cube (STDP memories, channel-level KEEP
+  composition, multiplexed write) the same reductions run with the
+  state carried by the memories. These terms exposed a convention
+  defect in the topographic assembly (`orchestrate.rewrite`): the KEEP
+  rule compared the binder's fine phase with the redex lambda's full
+  depth, so a variable bound inside the body by a binder at depth 7
+  mod 8 was decremented as if it were free, and a binder at depth 8 or
+  more was decremented as if it sat above the redex. The rule now uses
+  the full binder address and the free flag; the bank pins both cases
+  with minimal terms and lists which demos trigger them. The defect was
+  first seen on the same append written with the cons already applied
+  (`cons h t = \c n. c h (t c n)`, 69 tokens, 12 reductions). There the
+  old rule is wrong from the second reduction, on two variables whose
+  binder sits at address 7, while the channel-level composition and the
+  corrected assembly equal the oracle's re-encoding on every slot; the
+  bank pins that diagnosis. It also checks that the three definitions
+  of the binding truth in the repository (closed loop, phase-ring bank,
+  free-variable bank) agree at every reduction of the demos. The paper's
+  analog counter refuses the 87-token term at step 1 (tau_m = 300 ms)
+  and at step 2 (tau_m = 1000 ms) without computing a wrong result.
 
 See `docs/authors_note_draft.md` for the technical note that accompanies
 this repository (fixes, envelope analysis, noise study), and
@@ -86,6 +114,8 @@ python run_robustness.py  # the paper's validation blocks
 python run_noise.py       # Monte-Carlo noise study of the binding circuit
 python run_multiplex.py   # sequential vs multiplexed write cost comparison
 python run_stress.py      # stress: depth-scaled BIND bus, wide INTG bodies
+python run_balance.py     # positional balance counter: spec, circuit, closed loop
+python run_lists.py       # structured data: Church lists in the closed loop
 ```
 
 To enable the C engine:
@@ -105,7 +135,7 @@ python run_all.py
 ```
 
 `run_all.py` is the canonical local equivalent of the CI validation job:
-it runs the 21 banks in a fixed order, stops at the first failure, and
+it runs the 23 banks in a fixed order, stops at the first failure, and
 refuses Python's optimized (`-O`) mode because that mode disables the
 assertions used by the validation scripts. The suite is standard-library
 only apart from the C compiler needed to build the C core; the C core is
@@ -116,7 +146,8 @@ optional for Python-only experiments but required by the complete suite.
 | `python run_loop.py` | End-to-end closed-loop reductions, checked against the symbolic oracle at every step. |
 | `python run_snn_core.py` | Spike-for-spike Python/C differential checks. |
 | `python run_cube.py` | STDP living-cube writes, corruption detection, and interruption/resumption on closed and open terms. |
-| `python run_all.py` | All 21 circuit, robustness, scaling, noise, ablation, and integration banks. |
+| `python run_lists.py` | Church lists (append, map, reverse) in the positional closed loop on both engines, the living cube, the measured diagnosis of the assembly defect, and the measured re-scan envelope on structured bodies. |
+| `python run_all.py` | All 23 circuit, robustness, scaling, noise, ablation, and integration banks. |
 
 ## Layout
 
@@ -140,7 +171,7 @@ optional for Python-only experiments but required by the complete suite.
 | `balance_digits.py` | positional balance counter spec: base-8 signed digits, carry events, comparator (chantier B) |
 | `orchestrate.py` | closed-loop Algorithm 1 with topographic event assembly |
 | `snn_core.c` / `snn_core.py` | bit-faithful C core + ctypes wrapper |
-| `run_*.py` | one validation bank per stage, plus robustness, noise, multiplexing, stress and balance |
+| `run_*.py` | one validation bank per stage, plus robustness, noise, multiplexing, stress, balance and lists |
 
 ## Scope: what runs on spikes, what runs in Python
 
@@ -184,6 +215,24 @@ channels for the free-variable index; for bound variables the index is
 already recoverable from the binder channels (n = d - 1 - b). Any
 silent channel is detected at readout, so a corrupted memory stops the
 loop instead of silently corrupting the reduction.
+
+**Re-scan envelope on structured bodies (measured, `run_lists.py`).**
+The neural re-scan is validated on the battery's numeral terms, whose
+bodies stay short and hold few binders. On the 38-token body of the
+fifth reduction of `append [1,2] [3]` (11 binders) it leaves its
+envelope in two independent ways, and both are detected (the circuit
+raises, the loop stops, nothing wrong is computed): with the nominal
+12 ms slot the ordinal wave does not reach the lowest binder inside the
+slot (its response lands in the next slot), and the analog INTG stack
+(tau_m = 1000 ms) closes the outer levels one token early, the
+finding-8 drift, even with the wave disabled. Sizing the slot to the
+wave budget (the stress-bank rule, 24.8 ms here) clears the first wall
+and leaves the second. The 43-token body of the second reduction of the
+same append in the two-binder encoding is refused at the nominal slot
+as well. The list demos therefore run the living cube on
+the channel-level KEEP reference (`neural_keep=False`). A positional
+counter per level, built from the mechanics of `balance_circuit.py`,
+is the natural candidate for the second wall and is not implemented.
 
 **Multiplexed argument copies (an alternative to Section 2.10.2).**
 The paper's Section 2.10.2 creates one nested-SCAN chain `pos_arg`
@@ -241,17 +290,21 @@ weakenings.
 
 ## Status and limits
 
-The CI runs all 22 validation banks. The checked properties are
+The CI runs all 23 validation banks. The checked properties are
 deterministic simulation results against this repository's symbolic oracle;
 they are evidence for this implementation, not a formal proof or an
 independent biological validation. Known limits, documented in the note:
 the balance counter drifts on wide bodies even with the tau_m >= 1000 ms
 fix (on the measured x^n shape the discharge is exact at 15 tokens and
-wrong at 39), and the binding circuit has a measured sensitivity to
+wrong at 39), the binding circuit has a measured sensitivity to
 one-bit phase noise: a majority vote over repeated multi-bit
 presentations eliminates the false bindings at 5 % noise (k=7: 0/40,
 and 0/300 over three seeds on the critical term at both 5 % and 10 %)
-and halves them at 10 % (residual open; see the noise study).
+and halves them at 10 % (residual open; see the noise study), and the
+neural re-scan leaves its envelope on wide structured bodies (wave
+budget at the nominal slot, INTG drift at both tested slot lengths;
+both detected, so the list demos compose the cube with the
+channel-level KEEP reference).
 
 Related paper: arXiv:2611.23182v1. This repository is an independent
 reimplementation for review purposes; it is not the authors' code.
